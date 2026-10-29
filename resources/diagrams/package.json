@@ -1,0 +1,13 @@
+{
+  "name": "teraphobia-diagrams",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "devDependencies": {
+    "@mermaid-js/layout-elk": "0.2.0",
+    "mermaid": "11.17.2",
+    "playwright": "^1.56.0"
+  }
+}

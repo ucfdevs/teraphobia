@@ -1,0 +1,96 @@
+---
+config:
+  layout: elk
+---
+classDiagram
+    direction TB
+    class Room {
+        +code: string
+        +hostUserId: string
+        +preset: Preset
+        +status: lobby | playing | ended
+        +seats: Seat[]
+        +join(name, rejoinToken?) Seat
+        +kick(seatId)
+        +start() Game
+    }
+    class Seat {
+        +id: string
+        +displayName: string
+        +userId?: string
+        +rejoinToken: string
+        +connected: boolean
+        +missedRounds: int
+    }
+    class Game {
+        +round: int
+        +phase: Phase
+        +players: Player[]
+        +monster: Monster
+        +rng: SeededRandom
+        +advancePhase()
+        +checkWin() Winner?
+    }
+    class Player {
+        +seat: Seat
+        +costume: Costume
+        +role: villager | monster
+        +alive: boolean
+        +lastCandleTarget?: string
+        +nightHunches: string[]
+    }
+    class Costume {
+        +hat: Hat
+        +mask: Mask
+        +heldItem: HeldItem
+        +sharedTraits(other) int
+    }
+    class CostumeDealer {
+        +deal(count, rng) Costume[]
+    }
+    class Monster {
+        <<abstract>>
+        +player: Player
+        +powerUsed: boolean
+        +usePower(target, game)
+    }
+    class Vampire {
+        +blockAction(target)
+    }
+    class Witch {
+        +plantFakeClue(target)
+    }
+    class Werewolf {
+        +doubleKill(a, b)
+    }
+    class PhaseTimer {
+        +endsAt: Date
+        +paused: boolean
+        +start(phase, preset)
+        +pause()
+        +resume()
+    }
+    class DayResolver {
+        +searchCap: int
+        +communeCap: int
+        +resolve(actions, game) Result[]
+    }
+    class VoteTally {
+        +votes: Map~string, string~
+        +banished() string?
+    }
+
+    Room "1" *-- "4..8" Seat
+    Room "1" --> "0..1" Game
+    Game "1" *-- "4..8" Player
+    Game --> PhaseTimer
+    Game --> DayResolver
+    Game --> VoteTally
+    Game "1" --> "1" Monster
+    Player --> Seat
+    Player *-- Costume
+    CostumeDealer ..> Costume : creates
+    Monster <|-- Vampire
+    Monster <|-- Witch
+    Monster <|-- Werewolf
+    style Game stroke:#F59A3C,stroke-width:3px

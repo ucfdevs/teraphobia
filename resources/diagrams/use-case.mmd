@@ -1,0 +1,46 @@
+flowchart LR
+    account(["Account holder"])
+    host(["Host"])
+    player(["Player"])
+    google(["Google OAuth"])
+    email(["Resend email"])
+
+    subgraph sys[" "]
+        direction TB
+        subgraph acc["Accounts (web + iOS)"]
+            direction TB
+            uc1(["Register + verify email"])
+            uc2(["Sign in with email or Google"])
+            uc3(["Recover or change password"])
+            uc14(["Edit profile + avatar"])
+            uc15(["View stats + game history"])
+        end
+        subgraph lob["Lobby (web host screen)"]
+            direction TB
+            uc4(["Create room + pick timer preset"])
+            uc5(["Kick player before start"])
+            uc6(["Start game"])
+        end
+        subgraph play["Gameplay (iOS controller)"]
+            direction TB
+            uc7(["Join room with code + name"])
+            uc8(["Rejoin same seat"])
+            uc9(["Night: pick victim or suspect"])
+            uc10(["Day: Search, Commune, or Candle"])
+            uc11(["Use Monster power"])
+            uc12(["Vote or Skip"])
+            uc13(["See end-of-game reveal"])
+        end
+    end
+
+    host -. "is an" .-> account
+    account --- uc1 & uc2 & uc3 & uc14 & uc15
+    host --- uc4 & uc5 & uc6
+    uc7 & uc8 & uc9 & uc10 & uc11 & uc12 & uc13 --- player
+    uc1 & uc3 --- email
+    uc2 --- google
+
+    classDef actor fill:#2A2560,stroke:#A99BF0,stroke-width:2px,color:#EEF0FA
+    classDef ext fill:#131A35,stroke:#7F8BB8,stroke-dasharray:6 4,color:#C9CFEA
+    class account,host,player actor
+    class google,email ext
