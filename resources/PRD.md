@@ -1,7 +1,5 @@
 # Teraphobia PRD
 
-Guilherme Oliveira, Oct 29, 2026
-
 ## Overview
 
 Teraphobia is a Halloween social deduction party game for 4 to 8 players in one room: a web app runs the game on a shared screen, and each player uses an iOS app as their controller. One player is secretly a Monster who kills at night; the Villagers gather private clues about the Monster's costume by day and vote to banish a suspect.
