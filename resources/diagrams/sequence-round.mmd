@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    participant M as Monster phone (iOS)
+    participant V as Villager phones (iOS)
+    participant S as Game server
+    participant W as Host screen (web)
+    participant DB as MongoDB
+
+    Note over M,W: Night (30s)
+    S->>W: phase:start night, endsAt
+    S->>M: phase:start night
+    S->>V: phase:start night
+    M->>S: night:submit victimId
+    V->>S: night:submit suspectId
+    Note over V,W: timer ends: apply candles, resolve the kill
+
+    Note over M,W: Morning (10s)
+    S->>W: morning:reveal deadIds or none
+    Note over S,W: win check
+
+    Note over M,W: Day actions (30s)
+    S->>V: phase:start day
+    S->>M: phase:start day (flavor message + power button)
+    V->>S: day:submit search / commune / candle
+    opt Vampire or Witch power unused
+        M->>S: power:use targetId
+    end
+    Note over V,W: timer ends: apply caps and Monster powers
+    S->>V: you:result (private clue)
+
+    Note over M,W: Discussion and vote (60s talk, 30s vote)
+    S->>W: phase:start vote
+    M->>S: vote:submit targetId or skip
+    V->>S: vote:submit targetId or skip
+    Note over V,W: timer ends: missed votes count as Skip
+    S->>W: vote:reveal votes, banishedId?
+    Note over S,W: win check
+
+    alt Monster banished or one Villager left
+        S->>W: game:over winner, monster type, hunches
+        S->>M: game:over
+        S->>V: game:over
+        S->>DB: save game, players, stats
+    else no winner
+        S->>W: phase:start night (next round)
+    end

@@ -1,0 +1,37 @@
+gantt
+    dateFormat YYYY-MM-DD
+    axisFormat %b %d
+    todayMarker off
+    tickInterval 1week
+
+    section M0 Planning
+    PRD (Gui)                              :done,    prd,   2026-10-29, 2d
+    UML diagrams (all, Gui leads)      :         diag,  2026-10-31, 6d
+    Repo scaffold + CI skeleton (Cameron, Gui)  :         scaf,  2026-11-01, 5d
+    Droplet + domain + HTTPS (Cameron)     :         drop,  2026-11-02, 4d
+    Instructor check-in                    :crit, milestone, chk, 2026-11-06, 0d
+
+    section M1 Foundations
+    Auth, email verify, reset (Teresa)     :         auth,  2026-11-07, 7d
+    REST API + MongoDB models (Bernardo)   :         rest,  2026-11-07, 7d
+    Shared socket schemas + quicktype (Bernardo) :   sch,   2026-11-07, 4d
+    Web shell + account pages (Lili, Cameron)       :         webs,  2026-11-08, 8d
+    iOS shell + join + sign in (Gui)       :         ioss,  2026-11-08, 8d
+    Design tokens + costume art v1 (Lili, Cameron) :     tok,   2026-11-07, 9d
+
+    section M2 Playable core
+    Lobby, rejoin tokens (Teresa)          :         lob,   2026-11-16, 4d
+    Phase engine + timers (Bernardo)       :         eng,   2026-11-16, 5d
+    Actions, powers, vote, win check (Teresa, Bernardo) : act, after eng, 4d
+    Web game screens (Lili, Cameron)                :         webg,  2026-11-16, 9d
+    iOS game screens (Gui)                 :         iosg,  2026-11-16, 9d
+    Full game playable                     :milestone, play, 2026-11-24, 0d
+
+    section M3 Polish and ship
+    Stats + history (Teresa, Cameron, Gui)    :         stat,  2026-11-25, 4d
+    Balance simulation script (Bernardo)   :         bal,   2026-11-25, 4d
+    E2E + reconnect tests (all)   :         e2e,   2026-11-21, 9d
+    Lighthouse 95+ pass (Cameron)             :         lh,    2026-11-26, 3d
+    TestFlight public build (Gui)          :         tf,    2026-11-26, 3d
+    Slides + AI disclosure (Gui)       :         sli,   2026-11-27, 3d
+    Final demo                             :crit, milestone, demo, 2026-12-01, 0d
