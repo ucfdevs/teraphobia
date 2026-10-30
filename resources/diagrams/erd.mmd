@@ -1,0 +1,55 @@
+erDiagram
+    USERS ||--o{ AUTH_TOKENS : "has many"
+    USERS ||--o{ GAMES : "hosts many"
+    USERS |o--o{ GAME_PLAYERS : "plays as many"
+    GAMES ||--|{ GAME_PLAYERS : "seats 4 to 8"
+
+    USERS {
+        ObjectId _id PK
+        string email UK
+        string passwordHash "optional"
+        string googleId "optional"
+        boolean emailVerified
+        string displayName
+        string avatarId
+        int gamesPlayed "stats"
+        int villagerWins "stats"
+        int vampireWins "stats"
+        int witchWins "stats"
+        int werewolfWins "stats"
+        date createdAt
+    }
+    AUTH_TOKENS {
+        ObjectId _id PK
+        ObjectId userId FK
+        string type "verify, reset, refresh"
+        string tokenHash
+        date expiresAt "TTL index"
+        date usedAt "optional"
+    }
+    GAMES {
+        ObjectId _id PK
+        string roomCode
+        ObjectId hostUserId FK
+        string preset "quick, normal, relaxed"
+        date startedAt
+        date endedAt
+        int playerCount
+        string monsterType "vampire, witch, werewolf"
+        string winner "villagers, monster"
+        string endReason "banished, outnumbered, forfeit"
+        int rounds
+    }
+    GAME_PLAYERS {
+        ObjectId _id PK
+        ObjectId gameId FK
+        ObjectId userId FK "null for guests"
+        string displayName
+        string hat
+        string mask
+        string heldItem
+        string role "villager, monster"
+        string outcome "won, lost"
+        int diedRound "optional"
+        array nightHunches "seat ids"
+    }
