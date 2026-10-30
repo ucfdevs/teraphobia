@@ -1,0 +1,37 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{email}}",
+    "password": "{{password}}",
+    "displayName": "Bruno Test"
+  }
+}
+
+script:pre-request {
+  // A fresh email each run, so Register can be re-sent without a 409. Login reuses it.
+  bru.setEnvVar("email", `bruno-test+${Date.now()}@example.com`);
+}
+
+tests {
+  test("creates the account", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().accessToken).to.be.a("string");
+    expect(res.getBody().user.email).to.equal(bru.getEnvVar("email"));
+    expect(res.getBody().user.emailVerified).to.equal(false);
+  });
+
+  test("never returns the password hash", function () {
+    expect(res.getBody().user).to.not.have.property("passwordHash");
+  });
+}
