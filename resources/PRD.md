@@ -382,13 +382,26 @@ Four milestones take the project from diagrams on Nov 6 to a tested, deployed ga
 | M2 Playable core | Nov 16 to Nov 24 | Lobby and rejoin, phase engine, actions, powers, vote, all game screens. Gate: full game playable |
 | M3 Polish and ship | Nov 25 to Nov 30 | Stats and history, balance simulation, E2E and Lighthouse, art and presentation. Gate: final demo, Dec 1 or 3 |
 
+**Team roles**
+
+| Person | Role |
+| --- | --- |
+| Guilherme Oliveira | Project Manager / Mobile |
+| Cameron Kinnear | Frontend |
+| Lili Alvarado | Frontend |
+| Bernardo Braga | Database |
+| Teresa Scavotto | API |
+
+Guilherme and Teresa also help on the frontend, but only after their own areas are done.
+
 **Owners by area (from team roles)**
 
 | Label | Area | Owner | Backup |
 | --- | --- | --- | --- |
-| `api` | REST, auth, email, database | Teresa, Bernardo | Each other |
+| `api` | REST endpoints, auth, email | Teresa | Bernardo |
+| `db` | MongoDB models, indexes, test database | Bernardo | Teresa |
 | `game` | Game engine, socket events, balance script | Teresa, Bernardo | Guilherme |
-| `web` | React host screen and account pages | Lili, Cameron | Each other |
+| `web` | React host screen and account pages | Lili, Cameron | Each other; later Guilherme, Teresa |
 | `ios` | SwiftUI controller, TestFlight | Guilherme | Cameron |
 | `infra` | CI/CD, Droplet, domain, Xcode Cloud | Cameron | Guilherme (CI/CD) |
 | `design` | Tokens, costume art, screens | Lili, Cameron | Each other |
