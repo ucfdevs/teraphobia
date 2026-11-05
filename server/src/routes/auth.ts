@@ -51,6 +51,8 @@ function sendSession(res: Response, status: number, user: UserDoc) {
   })
 }
 
+
+//register function
 async function register(req: Request, res: Response) {
   const email = normalizeEmail(req.body?.email)
   const { password, displayName } = req.body ?? {}
@@ -83,6 +85,7 @@ async function register(req: Request, res: Response) {
   }
 }
 
+//login
 async function login(req: Request, res: Response) {
   const email = normalizeEmail(req.body?.email)
   const { password } = req.body ?? {}
