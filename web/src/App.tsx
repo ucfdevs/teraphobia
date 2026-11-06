@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import LoginForm from './components/LoginForm';
 import logo from './assets/logo.svg';
 import './App.css';
+import RegisterForm from './components/RegisterForm';
 
 interface User {
   id: string;
@@ -148,36 +150,9 @@ export default function App() {
           {errorMsg && <div className="alert-error">{errorMsg}</div>}
           {successMsg && <div className="alert-success">{successMsg}</div>}
 
-          <form onSubmit={handleLogin}>
-            <div className="form-group">
-              <label className="form-label">Email / Login</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@ucf.edu"
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="form-input"
-              />
-            </div>
-
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? 'Authenticating...' : 'Sign In'}
-            </button>
-          </form>
-
+          <LoginForm email={email} password={password} loading={loading}
+          onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin}/>
+        
           <div className="card-footer">
             Need an account?
             <button
@@ -189,8 +164,10 @@ export default function App() {
             </button>
           </div>
         </div>
-      )}
-
+      )
+      
+      }
+        
       {/* REGISTER VIEW */}
       {view === 'register' && (
         <div className="auth-card">
@@ -198,48 +175,8 @@ export default function App() {
 
           {errorMsg && <div className="alert-error">{errorMsg}</div>}
 
-          <form onSubmit={handleRegister}>
-            <div className="form-group">
-              <label className="form-label">Full / Display Name</label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your Name"
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@ucf.edu"
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password (min. 8 characters)</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="form-input"
-              />
-            </div>
-
-            <button type="submit" disabled={loading} className="btn-primary">
-              {loading ? 'Creating Account...' : 'Register'}
-            </button>
-          </form>
+          <RegisterForm name={name} email={email} password={password} loading={loading}
+          onNameChange={setName} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleRegister} />
 
           <div className="card-footer">
             Already registered?
