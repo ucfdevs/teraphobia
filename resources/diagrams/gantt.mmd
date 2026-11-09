@@ -1,23 +1,26 @@
 gantt
     dateFormat YYYY-MM-DD
     axisFormat %b %d
-    todayMarker off
+    todayMarker stroke:#F59A3C,stroke-width:3px
     tickInterval 1week
 
     section M0 Planning
     PRD (Gui)                              :done,    prd,   2026-10-29, 2d
-    UML diagrams (all, Gui leads)      :         diag,  2026-10-31, 6d
-    Repo scaffold + CI skeleton (Cameron, Gui)  :         scaf,  2026-11-01, 5d
-    Droplet + domain + HTTPS (Cameron)     :         drop,  2026-11-02, 4d
+    UML diagrams (all, Gui leads)      :done,    diag,  2026-10-31, 6d
+    Repo scaffold (Cameron, Gui)           :done,    scaf,  2026-11-01, 5d
+    Droplet + domain + HTTPS (Cameron)     :done,    drop,  2026-11-02, 4d
     Instructor check-in                    :crit, milestone, chk, 2026-11-06, 0d
 
     section M1 Foundations
-    Auth, email verify, reset (Teresa)     :         auth,  2026-11-07, 7d
-    REST API + MongoDB models (Bernardo)   :         rest,  2026-11-07, 7d
+    Auth, email verify, reset (Teresa)     :active,  auth,  2026-11-07, 7d
+    REST API + MongoDB models (Bernardo)   :active,  rest,  2026-11-07, 7d
     Shared socket schemas + quicktype (Bernardo) :   sch,   2026-11-07, 4d
-    Web shell + account pages (Lili, Cameron)       :         webs,  2026-11-08, 8d
-    iOS shell + join + sign in (Gui)       :         ioss,  2026-11-08, 8d
-    Design tokens + costume art v1 (Lili, Cameron) :     tok,   2026-11-07, 9d
+    Web shell + account pages (Lili, Cameron)       :active,  webs,  2026-11-08, 8d
+    iOS shell + join + sign in (Gui)       :active,  ioss,  2026-11-08, 8d
+    Design tokens + costume art v1 (Lili, Cameron) :active, tok,   2026-11-07, 9d
+    CI pipeline + auto deploy (Cameron)    :         ci,    2026-11-10, 6d
+    OpenAPI spec + SwaggerHub (Gui)        :         api,   2026-11-10, 6d
+    Test harness + REST unit tests (Bernardo) :      tst,   2026-11-11, 5d
 
     section M2 Playable core
     Lobby, rejoin tokens (Teresa)          :         lob,   2026-11-16, 4d
@@ -25,13 +28,16 @@ gantt
     Actions, powers, vote, win check (Teresa, Bernardo) : act, after eng, 4d
     Web game screens (Lili, Cameron)                :         webg,  2026-11-16, 9d
     iOS game screens (Gui)                 :         iosg,  2026-11-16, 9d
+    Xcode Cloud builds (Cameron)           :         xcc,   2026-11-16, 3d
     Full game playable                     :milestone, play, 2026-11-24, 0d
 
     section M3 Polish and ship
     Stats + history (Teresa, Cameron, Gui)    :         stat,  2026-11-25, 4d
     Balance simulation script (Bernardo)   :         bal,   2026-11-25, 4d
     E2E + reconnect tests (all)   :         e2e,   2026-11-21, 9d
+    Load test, 5 games on the Droplet (Cameron) :     load,  2026-11-25, 2d
     Lighthouse 95+ pass (Cameron)             :         lh,    2026-11-26, 3d
     TestFlight public build (Gui)          :         tf,    2026-11-26, 3d
     Slides + AI disclosure (Gui)       :         sli,   2026-11-27, 3d
+    Presentation rehearsal (all)           :         reh,   2026-11-29, 2d
     Final demo                             :crit, milestone, demo, 2026-12-01, 0d

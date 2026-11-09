@@ -10,15 +10,18 @@ sequenceDiagram
     S->>W: phase:start night, endsAt
     S->>M: phase:start night
     S->>V: phase:start night
-    M->>S: night:submit victimId
+    M->>S: night:submit victimIds (two if Werewolf power)
     V->>S: night:submit suspectId
     Note over V,W: timer ends: apply candles, resolve the kill
 
     Note over M,W: Morning (10s)
     S->>W: morning:reveal deadIds or none
+    S->>M: morning:reveal
+    S->>V: morning:reveal (dead players see Out)
     Note over S,W: win check
 
     Note over M,W: Day actions (30s)
+    S->>W: phase:start day, endsAt
     S->>V: phase:start day
     S->>M: phase:start day (flavor message + power button)
     V->>S: day:submit search / commune / candle
@@ -26,14 +29,21 @@ sequenceDiagram
         M->>S: power:use targetId
     end
     Note over V,W: timer ends: apply caps and Monster powers
-    S->>V: you:result (private clue)
+    S->>V: you:result (clue, nothing found, or candle blocked)
 
-    Note over M,W: Discussion and vote (60s talk, 30s vote)
-    S->>W: phase:start vote
+    Note over M,W: Discussion (60s), then vote (30s)
+    S->>W: phase:start discussion, endsAt
+    S->>M: phase:start discussion
+    S->>V: phase:start discussion
+    S->>W: phase:start vote, endsAt
+    S->>M: phase:start vote
+    S->>V: phase:start vote
     M->>S: vote:submit targetId or skip
     V->>S: vote:submit targetId or skip
     Note over V,W: timer ends: missed votes count as Skip
     S->>W: vote:reveal votes, banishedId?
+    S->>M: vote:reveal
+    S->>V: vote:reveal
     Note over S,W: win check
 
     alt Monster banished or one Villager left

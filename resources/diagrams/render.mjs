@@ -16,11 +16,13 @@ const roots = {
 };
 
 const diagrams = [
-  { file: 'gantt', title: 'Schedule', caption: 'Four milestones from planning to the final demo. Orange diamonds mark the check-in and the demo.' },
+  { file: 'gantt', title: 'Schedule', caption: 'Four milestones from planning to the final demo.' },
   { file: 'erd', title: 'Data model', caption: 'MongoDB keeps accounts and finished games. Live games stay in server memory until they end.' },
-  { file: 'use-case', title: 'Use cases', caption: 'What each actor can do. The host is an account holder and can also join a game as a player.' },
+  { file: 'use-case', title: 'Use cases', caption: 'What each actor can do. The host is an account holder, and a player can sign in but does not have to.' },
   { file: 'class', title: 'Game classes', caption: 'The server-side game model. Game runs the round loop, and each Monster type adds one power.' },
   { file: 'sequence-round', title: 'One round', caption: 'From Night to the win check. Every phase ends on its timer, never early.' },
+  { file: 'sequence-auth', title: 'Accounts', caption: 'Register, verify, sign in, and reset a password. Only the server reads MongoDB or sends email.' },
+  { file: 'sequence-lobby', title: 'Lobby and rejoin', caption: 'From creating a room to the first Night, plus how a dropped phone gets its seat back.' },
 ];
 
 const c = {
@@ -79,10 +81,10 @@ const theme = {
     taskTextLightColor: c.bone,
     taskTextOutsideColor: c.bone,
     taskTextDarkColor: c.bone,
-    activeTaskBkgColor: '#6B5FC0',
-    activeTaskBorderColor: c.ghost,
-    doneTaskBkgColor: '#2B3360',
-    doneTaskBorderColor: '#5C68A6',
+    activeTaskBkgColor: '#7C6CE0',
+    activeTaskBorderColor: '#C9BFFF',
+    doneTaskBkgColor: '#1C2244',
+    doneTaskBorderColor: '#333D6E',
     critBkgColor: c.candle,
     critBorderColor: c.candle,
     gridColor: '#2E3866',
