@@ -5,7 +5,7 @@ flowchart LR
     google(["Google OAuth"])
     email(["Resend email"])
 
-    subgraph sys[" "]
+    subgraph sys["Teraphobia"]
         direction TB
         subgraph acc["Accounts (web + iOS)"]
             direction TB
@@ -20,11 +20,14 @@ flowchart LR
             uc4(["Create room + pick timer preset"])
             uc5(["Kick player before start"])
             uc6(["Start game"])
+            uc16(["Reopen room after a drop"])
+            uc17(["Play again"])
         end
         subgraph play["Gameplay (iOS controller)"]
             direction TB
-            uc7(["Join room with code + name"])
+            uc7(["Join room by code or QR"])
             uc8(["Rejoin same seat"])
+            uc18(["See own role privately"])
             uc9(["Night: pick victim or suspect"])
             uc10(["Day: Search, Commune, or Candle"])
             uc11(["Use Monster power"])
@@ -35,8 +38,8 @@ flowchart LR
 
     host -. "is an" .-> account
     account --- uc1 & uc2 & uc3 & uc14 & uc15
-    host --- uc4 & uc5 & uc6
-    uc7 & uc8 & uc9 & uc10 & uc11 & uc12 & uc13 --- player
+    host --- uc4 & uc5 & uc6 & uc16 & uc17
+    uc7 & uc8 & uc18 & uc9 & uc10 & uc11 & uc12 & uc13 --- player
     uc1 & uc3 --- email
     uc2 --- google
 
