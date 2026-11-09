@@ -369,3 +369,147 @@ body {
   position: relative;
   z-index: 10;
 }
+
+/* ==========================================================================
+   LANDING PAGE (Issue #15)
+   ========================================================================== */
+
+.landing-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  box-sizing: border-box;
+}
+
+.landing-hero {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.landing-title {
+  font-size: clamp(1.8rem, 4vw, 2.75rem);
+  font-weight: 800;
+  color: #f8fafc;
+  /* Crisp off-white for contrast */
+  line-height: 1.2;
+  margin-bottom: 1.25rem;
+}
+
+.landing-pitch {
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  color: #cbd5e1;
+  /* Slate 300 for WCAG AA readability */
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.landing-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.landing-btn {
+  min-width: 160px;
+  padding: 0.85rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Accessible focus ring for keyboard navigation */
+.landing-btn:focus-visible,
+.btn-link:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #f97316 !important;
+  /* Brand orange accent */
+  outline-offset: 3px !important;
+}
+
+/* 3-Step Section */
+.landing-how {
+  width: 100%;
+}
+
+.landing-section-heading {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 2rem;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.step-card {
+  background: rgba(15, 23, 42, 0.75);
+  /* Dark navy */
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 1.75rem 1.25rem;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #f97316;
+  /* Orange accent */
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.step-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 0.5rem;
+}
+
+.step-desc {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  /* High-contrast muted text */
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Ensure no horizontal scroll on narrow mobile screens (360px) */
+@media (max-width: 400px) {
+  .landing-container {
+    padding: 1rem 0.75rem;
+  }
+
+  .landing-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .landing-btn {
+    width: 100%;
+  }
+}
