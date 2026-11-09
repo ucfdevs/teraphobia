@@ -1,0 +1,19 @@
+
+#lobbyheader {
+    display: flex;
+    flex-direction: row;
+}
+
+.seperator {
+    height: 5px;
+    background-color: red;
+    width: 90%;
+    margin-left: 5%;
+}
+
+#userlist {
+    display: flex;
+    width: 90%;
+    height: 500px;
+    margin-left: 5%;
+}
