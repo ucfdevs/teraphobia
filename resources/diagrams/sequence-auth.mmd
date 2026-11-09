@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    participant C as Web or iOS app
+    participant S as API server
+    participant DB as MongoDB
+    participant R as Resend
+    participant G as Google
+
+    Note over C,R: Register and verify email
+    C->>S: POST /auth/register email, password, displayName
+    S->>DB: insert user (bcrypt hash, emailVerified false)
+    S->>DB: insert authToken type verify, expires in 24h
+    S->>R: send verification email
+    S-->>C: 201 access token, user
+    C->>S: POST /auth/verify token
+    S->>DB: mark token used, set emailVerified true
+    S-->>C: 200 verified
+
+    Note over C,G: Sign in
+    alt Email and password
+        C->>S: POST /auth/login email, password
+        S->>DB: find user, compare bcrypt hash
+    else Google
+        C->>G: Google sign in
+        G-->>C: ID token
+        C->>S: POST /auth/google idToken
+        S->>G: verify ID token
+        S->>DB: find or create user, link googleId by email
+    end
+    S->>DB: insert authToken type refresh
+    S-->>C: access token + refresh token
+
+    Note over C,DB: Access token expires (15 min)
+    C->>S: POST /auth/refresh refreshToken
+    S->>DB: check refresh token hash
+    S-->>C: new access token
+
+    Note over C,R: Forgot password
+    C->>S: POST /auth/forgot-password email
+    S->>DB: insert authToken type reset, expires in 1h
+    S->>R: send reset email
+    S-->>C: 200 check your email
+    C->>S: POST /auth/reset-password token, newPassword
+    S->>DB: save new hash, mark token used, delete refresh tokens
+    S-->>C: 200 sign in again

@@ -1,0 +1,49 @@
+sequenceDiagram
+    autonumber
+    participant W as Host screen (web)
+    participant S as Game server
+    participant P as Player phones (iOS)
+    participant DB as MongoDB
+
+    Note over W,DB: Create room (verified host only)
+    W->>S: POST /rooms preset
+    S->>DB: check host emailVerified
+    S-->>W: room code
+    W->>S: connect to room as host
+    S->>W: room:state players, preset
+    Note over W: shows code + join QR
+
+    Note over S,P: Join (the QR opens the app with the code filled in)
+    P->>S: GET /rooms/:code
+    S-->>P: open, started, full, or not found
+    P->>S: room:join code, displayName
+    alt name taken, room full, or game started
+        S->>P: error code, message
+    else seat open
+        S-->>P: seat + rejoinToken
+        S->>W: room:state players
+    end
+
+    opt Host kicks a player before Start
+        W->>S: room:kick seatId
+        S->>P: error kicked
+        S->>W: room:state players
+    end
+
+    Note over W,P: Start (4 to 8 players)
+    W->>S: room:start
+    Note over S: deal costumes, pick Monster + type, lock the code
+    S->>P: you:role role, costume (monsterType to the Monster only)
+    S->>W: room:state playing
+    S->>W: phase:start night (see One round)
+
+    Note over S,P: A phone drops and comes back
+    P->>S: room:join code, rejoinToken (or signed-in account)
+    S->>P: you:rejoined full private state
+    S->>W: room:state player connected
+    Note over S,P: gone 2 full rounds: removed as if killed, Monster gone means Villagers win
+
+    Note over W,S: The host screen drops
+    S->>P: room:state host disconnected, timers paused
+    W->>S: reopen room as host
+    S->>W: room:state, timers resume

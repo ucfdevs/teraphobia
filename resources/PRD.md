@@ -26,13 +26,15 @@ Teraphobia is a Halloween social deduction party game for 4 to 8 players in one 
 
 ## Diagrams
 
-All five diagrams live in [`diagrams/`](diagrams/), with their Mermaid source and a render script.
+All seven diagrams live in [`diagrams/`](diagrams/), with their Mermaid source and a render script.
 
 - [Schedule (Gantt)](diagrams/gantt.png)
 - [Data model (ERD)](diagrams/erd.png)
 - [Use cases](diagrams/use-case.png)
 - [Game classes](diagrams/class.png)
 - [One round (sequence)](diagrams/sequence-round.png)
+- [Accounts (sequence)](diagrams/sequence-auth.png)
+- [Lobby and rejoin (sequence)](diagrams/sequence-lobby.png)
 
 ## Players and platforms
 

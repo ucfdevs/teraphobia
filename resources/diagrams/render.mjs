@@ -21,6 +21,8 @@ const diagrams = [
   { file: 'use-case', title: 'Use cases', caption: 'What each actor can do. The host is an account holder and can also join a game as a player.' },
   { file: 'class', title: 'Game classes', caption: 'The server-side game model. Game runs the round loop, and each Monster type adds one power.' },
   { file: 'sequence-round', title: 'One round', caption: 'From Night to the win check. Every phase ends on its timer, never early.' },
+  { file: 'sequence-auth', title: 'Accounts', caption: 'Register, verify, sign in, and reset a password. Only the server reads MongoDB or sends email.' },
+  { file: 'sequence-lobby', title: 'Lobby and rejoin', caption: 'From creating a room to the first Night, plus how a dropped phone gets its seat back.' },
 ];
 
 const c = {
