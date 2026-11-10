@@ -1,7 +1,9 @@
 import request from 'supertest'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createApp } from '../src/app.js'
 import { User } from '../src/models/user.js'
+
+vi.mock('../src/lib/email.js')
 
 const app = createApp()
 

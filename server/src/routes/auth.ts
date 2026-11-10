@@ -2,12 +2,16 @@ import bcrypt from 'bcrypt'
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { rateLimit } from 'express-rate-limit'
+import { sendVerificationEmail } from '../lib/email.js'
 import { signAccessToken } from '../lib/session.js'
 import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
+import { consumeToken, createToken } from '../models/authToken.js'
 import { User } from '../models/user.js'
 
 const BCRYPT_ROUNDS = 12
 const MONGO_DUPLICATE_KEY = 11000
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const RESEND_VERIFICATION_MESSAGE = 'If that account needs verifying, a new link is on its way'
 
 // Compared against when the account doesn't exist, so response time doesn't reveal which emails are registered.
 const DUMMY_HASH = bcrypt.hashSync('teraphobia-dummy-password', BCRYPT_ROUNDS)
@@ -22,6 +26,16 @@ function createLimiter() {
     legacyHeaders: false,
     message: { error: 'Too many attempts, try again later' },
   })
+}
+
+// Email failures are logged, never surfaced: the user can ask for a new link.
+async function emailVerificationLink(user: UserDoc) {
+  try {
+    const token = await createToken(user._id, 'verify', VERIFY_TOKEN_TTL_MS)
+    await sendVerificationEmail(user.email, token)
+  } catch (err) {
+    console.error('Could not send verification email', err)
+  }
 }
 
 function sendSession(res: Response, status: number, user: UserDoc) {
@@ -61,6 +75,7 @@ async function register(req: Request, res: Response) {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
   try {
     const user = await User.create({ email, passwordHash, displayName: name })
+    await emailVerificationLink(user)
     sendSession(res, 201, user)
   } catch (err) {
     if ((err as { code?: number }).code === MONGO_DUPLICATE_KEY) {
@@ -91,6 +106,23 @@ async function login(req: Request, res: Response) {
   sendSession(res, 200, user)
 }
 
+async function verify(req: Request, res: Response) {
+  const token = await consumeToken(req.body?.token, 'verify')
+  if (!token) {
+    res.status(400).json({ error: 'This link is invalid or has expired' })
+    return
+  }
+  await User.updateOne({ _id: token.userId }, { emailVerified: true })
+  res.json({ message: 'Email verified' })
+}
+
+// Same answer whether or not the email is registered.
+async function resendVerification(req: Request, res: Response) {
+  const user = await User.findOne({ email: normalizeEmail(req.body?.email) })
+  if (user && !user.emailVerified) await emailVerificationLink(user)
+  res.json({ message: RESEND_VERIFICATION_MESSAGE })
+}
+
 // A factory so every app (and every test) gets its own rate limiter.
 export function createAuthRouter() {
   const router = Router()
@@ -98,6 +130,8 @@ export function createAuthRouter() {
 
   router.post('/register', limiter, register)
   router.post('/login', limiter, login)
+  router.post('/verify', limiter, verify)
+  router.post('/resend-verification', limiter, resendVerification)
 
   return router
 }
