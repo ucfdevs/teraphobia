@@ -15,13 +15,15 @@ const DUMMY_HASH = bcrypt.hashSync('teraphobia-dummy-password', BCRYPT_ROUNDS)
 
 type UserDoc = InstanceType<typeof User>
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  message: { error: 'Too many attempts, try again later' },
-})
+function createLimiter() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Too many attempts, try again later' },
+  })
+}
 
 function normalizeEmail(value: unknown) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
@@ -105,7 +107,13 @@ async function login(req: Request, res: Response) {
   sendSession(res, 200, user)
 }
 
-export const authRouter = Router()
+// A factory so every app (and every test) gets its own rate limiter.
+export function createAuthRouter() {
+  const router = Router()
+  const limiter = createLimiter()
 
-authRouter.post('/register', limiter, register)
-authRouter.post('/login', limiter, login)
+  router.post('/register', limiter, register)
+  router.post('/login', limiter, login)
+
+  return router
+}

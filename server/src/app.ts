@@ -1,6 +1,6 @@
 import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
-import { authRouter } from './routes/auth.js'
+import { createAuthRouter } from './routes/auth.js'
 
 export function createApp() {
   const app = express()
@@ -8,7 +8,7 @@ export function createApp() {
   // One proxy hop (Nginx), so rate limits see the real client IP.
   app.set('trust proxy', 1)
   app.use(express.json())
-  app.use('/api/auth', authRouter)
+  app.use('/api/auth', createAuthRouter())
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' })
