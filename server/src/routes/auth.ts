@@ -3,6 +3,8 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import { sendVerificationEmail } from '../lib/email.js'
+import { verifyGoogleIdToken } from '../lib/google.js'
+import type { GoogleIdentity } from '../lib/google.js'
 import { signAccessToken } from '../lib/session.js'
 import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
 import { requireAuth } from '../middleware/requireAuth.js'
@@ -128,6 +130,59 @@ async function resendVerification(req: Request, res: Response) {
   res.json({ message: RESEND_VERIFICATION_MESSAGE })
 }
 
+// Finds the user for a Google identity: by googleId, else links the account with the same email, else creates one.
+async function findOrCreateGoogleUser(identity: GoogleIdentity): Promise<UserDoc | null> {
+  const email = normalizeEmail(identity.email)
+  const linked = await User.findOne({ googleId: identity.googleId })
+  if (linked) return linked
+
+  const existing = await User.findOne({ email })
+  if (existing) {
+    // Already linked to a different Google account.
+    if (existing.googleId) return null
+    existing.googleId = identity.googleId
+    existing.emailVerified = true
+    return existing.save()
+  }
+
+  const displayName = validDisplayName(identity.name?.slice(0, 32)) ?? validDisplayName(email.split('@')[0].slice(0, 32)) ?? 'Player'
+  try {
+    return await User.create({ email, googleId: identity.googleId, emailVerified: true, displayName })
+  } catch (err) {
+    // Another request created the account first; link to it instead.
+    if ((err as { code?: number }).code === MONGO_DUPLICATE_KEY) return findOrCreateGoogleUser(identity)
+    throw err
+  }
+}
+
+async function googleSignIn(req: Request, res: Response) {
+  const { idToken } = req.body ?? {}
+  if (typeof idToken !== 'string' || !idToken) {
+    res.status(400).json({ error: 'idToken is required' })
+    return
+  }
+
+  let identity: GoogleIdentity
+  try {
+    identity = await verifyGoogleIdToken(idToken)
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired Google token' })
+    return
+  }
+  // An unverified Google email must never take over a password account.
+  if (!identity.emailVerified) {
+    res.status(401).json({ error: 'Google account email is not verified' })
+    return
+  }
+
+  const user = await findOrCreateGoogleUser(identity)
+  if (!user) {
+    res.status(409).json({ error: 'This email is linked to a different Google account' })
+    return
+  }
+  await sendSession(res, 200, user)
+}
+
 // Rotates the refresh token: the old one is used up and a new pair comes back.
 async function refresh(req: Request, res: Response) {
   const token = await consumeToken(req.body?.refreshToken, 'refresh')
@@ -162,6 +217,7 @@ export function createAuthRouter() {
   router.post('/login', limiter, login)
   router.post('/verify', limiter, verify)
   router.post('/resend-verification', limiter, resendVerification)
+  router.post('/google', limiter, googleSignIn)
   router.post('/refresh', refresh)
   router.post('/logout', requireAuth, logout)
 
