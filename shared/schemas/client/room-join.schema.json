@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "client/room-join.schema.json",
   "title": "RoomJoin",
   "description": "Client to server, event `room:join`. A player joins a room, or rejoins their seat with a rejoin token.",
   "type": "object",

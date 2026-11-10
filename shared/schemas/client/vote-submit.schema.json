@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "client/vote-submit.schema.json",
   "title": "VoteSubmit",
   "description": "Client to server, event `vote:submit`. A living player votes to banish a player, or sends null to Skip. A missed vote counts as Skip.",
   "type": "object",

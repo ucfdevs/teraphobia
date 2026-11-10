@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VoteReveal",
+  "description": "Server to all, event `vote:reveal`. Sent after the vote closes: who voted for whom, and who was banished.",
+  "type": "object",
+  "properties": {
+    "round": { "$ref": "../common.schema.json#/definitions/Round" },
+    "votes": {
+      "description": "One entry per living player. A missed vote shows as Skip (null).",
+      "type": "array",
+      "items": { "$ref": "#/definitions/Vote" },
+      "maxItems": 8
+    },
+    "banishedId": {
+      "description": "Banished seat, or null when Skip wins or there is a tie.",
+      "$ref": "../common.schema.json#/definitions/NullableSeatId"
+    }
+  },
+  "required": ["round", "votes", "banishedId"],
+  "additionalProperties": false,
+  "definitions": {
+    "Vote": {
+      "type": "object",
+      "properties": {
+        "voterId": { "$ref": "../common.schema.json#/definitions/SeatId" },
+        "targetId": {
+          "description": "Seat voted for, or null for Skip.",
+          "$ref": "../common.schema.json#/definitions/NullableSeatId"
+        }
+      },
+      "required": ["voterId", "targetId"],
+      "additionalProperties": false
+    }
+  }
+}

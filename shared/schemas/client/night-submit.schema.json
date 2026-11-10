@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "client/night-submit.schema.json",
   "title": "NightSubmit",
   "description": "Client to server, event `night:submit`. The Monster picks victims; a Villager names who they suspect. The server checks the sender's role, so both shapes use the same event.",
   "oneOf": [

@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoomState",
+  "description": "Server to all, event `room:state`. Public room snapshot, sent whenever a seat, connection, or status changes. Never includes roles, rejoin tokens, or user ids.",
+  "type": "object",
+  "properties": {
+    "code": { "$ref": "../common.schema.json#/definitions/RoomCode" },
+    "status": { "$ref": "../common.schema.json#/definitions/RoomStatus" },
+    "preset": { "$ref": "../common.schema.json#/definitions/Preset" },
+    "hostConnected": {
+      "description": "False while the host screen is away. Timers are paused until it returns.",
+      "type": "boolean"
+    },
+    "seats": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/PublicSeat" },
+      "maxItems": 8
+    }
+  },
+  "required": ["code", "status", "preset", "hostConnected", "seats"],
+  "additionalProperties": false,
+  "definitions": {
+    "PublicSeat": {
+      "type": "object",
+      "properties": {
+        "seatId": { "$ref": "../common.schema.json#/definitions/SeatId" },
+        "displayName": { "$ref": "../common.schema.json#/definitions/DisplayName" },
+        "connected": { "type": "boolean" },
+        "lifeStatus": { "$ref": "../common.schema.json#/definitions/LifeStatus" },
+        "costume": {
+          "description": "Null in the lobby, before costumes are dealt.",
+          "anyOf": [
+            { "$ref": "../common.schema.json#/definitions/Costume" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["seatId", "displayName", "connected", "lifeStatus", "costume"],
+      "additionalProperties": false
+    }
+  }
+}

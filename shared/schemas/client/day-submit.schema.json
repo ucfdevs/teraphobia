@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "client/day-submit.schema.json",
   "title": "DaySubmit",
   "description": "Client to server, event `day:submit`. A living Villager picks one private Day action. Candle needs a target; Search and Commune take none.",
   "type": "object",

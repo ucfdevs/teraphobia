@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "common.schema.json",
   "title": "Common",
   "description": "Shared types referenced by the socket event schemas.",
   "definitions": {
@@ -20,6 +19,91 @@
       "description": "Server-assigned id for a player's seat in the room.",
       "type": "string",
       "minLength": 1
+    },
+    "NullableSeatId": {
+      "description": "A seat id, or null (for example Skip in a vote, or nobody banished).",
+      "anyOf": [
+        { "$ref": "#/definitions/SeatId" },
+        { "type": "null" }
+      ]
+    },
+    "EpochMs": {
+      "description": "Server time in milliseconds since the Unix epoch.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "Round": {
+      "description": "Round number, starting at 1.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "Preset": {
+      "description": "Timer preset picked by the host.",
+      "type": "string",
+      "enum": ["quick", "normal", "relaxed"]
+    },
+    "RoomStatus": {
+      "type": "string",
+      "enum": ["lobby", "playing", "ended"]
+    },
+    "Phase": {
+      "type": "string",
+      "enum": ["night", "morning", "day", "discussion", "vote"]
+    },
+    "Role": {
+      "type": "string",
+      "enum": ["villager", "monster"]
+    },
+    "MonsterType": {
+      "type": "string",
+      "enum": ["vampire", "witch", "werewolf"]
+    },
+    "LifeStatus": {
+      "description": "Public status. A player removed for disconnecting 2 rounds shows as dead.",
+      "type": "string",
+      "enum": ["alive", "dead", "banished"]
+    },
+    "Winner": {
+      "type": "string",
+      "enum": ["villagers", "monster"]
+    },
+    "EndReason": {
+      "type": "string",
+      "enum": ["banished", "outnumbered", "forfeit"]
+    },
+    "DayAction": {
+      "type": "string",
+      "enum": ["search", "commune", "candle"]
+    },
+    "TraitSlot": {
+      "type": "string",
+      "enum": ["hat", "mask", "heldItem"]
+    },
+    "TraitOption": {
+      "description": "Option id within a slot (4 per slot). Switch to enums once the costume art names are final.",
+      "type": "string",
+      "minLength": 1
+    },
+    "Costume": {
+      "description": "Public costume: one option in each of the 3 slots.",
+      "type": "object",
+      "properties": {
+        "hat": { "$ref": "#/definitions/TraitOption" },
+        "mask": { "$ref": "#/definitions/TraitOption" },
+        "heldItem": { "$ref": "#/definitions/TraitOption" }
+      },
+      "required": ["hat", "mask", "heldItem"],
+      "additionalProperties": false
+    },
+    "Trait": {
+      "description": "One costume trait, used in Search and Commune results.",
+      "type": "object",
+      "properties": {
+        "slot": { "$ref": "#/definitions/TraitSlot" },
+        "option": { "$ref": "#/definitions/TraitOption" }
+      },
+      "required": ["slot", "option"],
+      "additionalProperties": false
     }
   }
 }
