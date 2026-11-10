@@ -17,3 +17,15 @@
     height: 500px;
     margin-left: 5%;
 }
+
+.start-game-button {
+    background-color: red;
+    border-radius: 5px;
+    border: none;
+    width: fit-content;
+    padding: 10px;
+}
+
+.start-game-button:hover {
+    cursor: pointer;
+}

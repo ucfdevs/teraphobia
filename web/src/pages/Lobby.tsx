@@ -55,6 +55,7 @@ function Lobby() {
         <div id="userlist">
             <LobbyUser username='Example' profileSrc='sanitized'/>
         </div>
+        <button className='start-game-button'>Start Game</button>
         </>
     )
 }
