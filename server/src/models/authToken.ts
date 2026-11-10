@@ -36,6 +36,13 @@ export function consumeToken(raw: unknown, type: AuthTokenType) {
   )
 }
 
+// True if a token of this type was made for the user in the last minute, so emails can't be spammed.
+// A token made at time t expires at t + ttlMs, so "made after now - 1 min" means "expires after now + ttlMs - 1 min".
+export async function createdRecently(userId: Types.ObjectId | string, type: AuthTokenType, ttlMs: number) {
+  const found = await AuthToken.exists({ userId, type, expiresAt: { $gt: new Date(Date.now() + ttlMs - 60_000) } })
+  return found !== null
+}
+
 // Ends sessions by marking refresh tokens used.
 export function revokeRefreshTokens(userId: Types.ObjectId | string) {
   return AuthToken.updateMany({ userId, type: 'refresh', usedAt: null }, { usedAt: new Date() })

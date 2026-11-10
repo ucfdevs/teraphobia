@@ -137,3 +137,25 @@ describe('POST /api/auth/change-password', () => {
     expect(anonymous.status).toBe(401)
   })
 })
+
+describe('reset link limits', () => {
+  const app = createApp()
+
+  it('sends at most one reset email a minute', async () => {
+    const user = await createUser()
+    await request(app).post('/api/auth/forgot-password').send({ email: user.email })
+    const second = await request(app).post('/api/auth/forgot-password').send({ email: user.email })
+
+    expect(second.status).toBe(200)
+    expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops older reset links once one is used', async () => {
+    const user = await createUser()
+    const older = await createToken(user._id, 'reset', 60 * 60_000)
+    const newer = await createToken(user._id, 'reset', 60 * 60_000)
+
+    expect((await request(app).post('/api/auth/reset-password').send({ token: newer, password: 'brand-new-pass' })).status).toBe(200)
+    expect((await request(app).post('/api/auth/reset-password').send({ token: older, password: 'another-pass' })).status).toBe(400)
+  })
+})

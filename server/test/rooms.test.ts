@@ -1,7 +1,7 @@
 import request from 'supertest'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.js'
-import { clearRooms, getRoom, MAX_PLAYERS } from '../src/rooms/store.js'
+import { clearRooms, createRoom, getRoom, MAX_PLAYERS } from '../src/rooms/store.js'
 import { bearer, createUser } from './helpers.js'
 
 const app = createApp()
@@ -29,15 +29,19 @@ describe('POST /api/rooms', () => {
     }
   })
 
-  it('gives 100 rooms 100 different codes', async () => {
-    const host = await createUser({ emailVerified: true })
-    const auth = bearer(host)
+  it('gives 100 rooms 100 different codes', () => {
     const codes = new Set<string>()
-    for (let i = 0; i < 100; i += 1) {
-      const res = await request(app).post('/api/rooms').set('Authorization', auth).send({})
-      codes.add(res.body.code)
-    }
+    for (let i = 0; i < 100; i += 1) codes.add(createRoom(`host-${i}`, 'normal').code)
     expect(codes.size).toBe(100)
+  })
+
+  it("replaces the host's old room", async () => {
+    const host = await createUser({ emailVerified: true })
+    const first = await request(app).post('/api/rooms').set('Authorization', bearer(host)).send({})
+    const second = await request(app).post('/api/rooms').set('Authorization', bearer(host)).send({})
+
+    expect(getRoom(first.body.code)).toBeUndefined()
+    expect(getRoom(second.body.code)?.hostUserId).toBe(host.id)
   })
 
   it('returns 401 with no token', async () => {

@@ -90,7 +90,7 @@ describe('GET /api/users/me/games', () => {
 
   it('returns 400 for a bad page or limit', async () => {
     const auth = bearer(await createUser())
-    for (const query of ['page=0', 'page=abc', 'limit=-1', 'limit=1.5']) {
+    for (const query of ['page=0', 'page=abc', 'limit=-1', 'limit=1.5', 'page=1000000000000000000']) {
       expect((await request(app).get(`/api/users/me/games?${query}`).set('Authorization', auth)).status).toBe(400)
     }
   })

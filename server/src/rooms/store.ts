@@ -36,6 +36,10 @@ export function normalizeCode(code: string) {
 }
 
 export function createRoom(hostUserId: string, preset: Preset): Room {
+  // One live room per host: a new room replaces the old one, so rooms can't pile up.
+  for (const room of rooms.values()) {
+    if (room.hostUserId === hostUserId) rooms.delete(room.code)
+  }
   // 26^4 = 456,976 codes, so collisions are rare; the cap only guards against a full store.
   for (let attempt = 0; attempt < 1000; attempt += 1) {
     const code = randomCode()

@@ -17,6 +17,8 @@ export async function sendEmail({ to, subject, text, html }: Email) {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, text, html }),
+    // Register waits on this call, so a slow Resend can't hang sign up for long.
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`Resend responded ${res.status}: ${await res.text()}`)
 }

@@ -106,3 +106,15 @@ describe('POST /api/auth/resend-verification', () => {
     expect(sendMock).not.toHaveBeenCalled()
   })
 })
+
+describe('verification email limits', () => {
+  it('sends at most one verification email a minute', async () => {
+    const limited = createApp()
+    const user = await createUser()
+    await request(limited).post('/api/auth/resend-verification').send({ email: user.email })
+    const second = await request(limited).post('/api/auth/resend-verification').send({ email: user.email })
+
+    expect(second.status).toBe(200)
+    expect(sendMock).toHaveBeenCalledTimes(1)
+  })
+})

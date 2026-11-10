@@ -9,11 +9,12 @@ const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
 
 // Parses a positive integer query value; undefined falls back, anything else is null.
+// Capped at a million so a huge page can't overflow MongoDB's $skip.
 function positiveInt(value: unknown, fallback: number) {
   if (value === undefined) return fallback
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return null
   const n = Number(value)
-  return n >= 1 ? n : null
+  return n >= 1 && n <= 1_000_000 ? n : null
 }
 
 interface HistoryRow {

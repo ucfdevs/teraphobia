@@ -68,3 +68,23 @@ describe('POST /api/auth/login', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('default display name', () => {
+  it('cuts a long email name to 32 characters', async () => {
+    const local = 'a'.repeat(40)
+    const res = await request(createApp()).post('/api/auth/register').send({ email: `${local}@example.com`, password: 'correct-horse' })
+    expect(res.status).toBe(201)
+    expect(res.body.user.displayName).toBe('a'.repeat(32))
+  })
+})
+
+describe('rate limits', () => {
+  it('gives each route its own limit', async () => {
+    const limited = createApp()
+    for (let i = 0; i < 20; i += 1) await request(limited).post('/api/auth/login').send({})
+    expect((await request(limited).post('/api/auth/login').send({})).status).toBe(429)
+
+    const res = await request(limited).post('/api/auth/register').send({ email: 'limits@example.com', password: 'correct-horse' })
+    expect(res.status).toBe(201)
+  })
+})

@@ -70,22 +70,15 @@ describe('POST /api/auth/logout', () => {
     expect((await request(app).post('/api/auth/refresh').send({ refreshToken })).status).toBe(401)
   })
 
-  it('requires an access token', async () => {
-    const res = await request(app).post('/api/auth/logout').send({ refreshToken: 'anything' })
-    expect(res.status).toBe(401)
+  it('works without an access token', async () => {
+    const user = await createUser()
+    const refreshToken = await createToken(user._id, 'refresh', 60_000)
+
+    expect((await request(app).post('/api/auth/logout').send({ refreshToken })).status).toBe(204)
+    expect((await request(app).post('/api/auth/refresh').send({ refreshToken })).status).toBe(401)
   })
 
   it('requires a refreshToken', async () => {
-    const user = await createUser()
-    expect((await request(app).post('/api/auth/logout').set('Authorization', bearer(user)).send({})).status).toBe(400)
-  })
-
-  it("can't revoke another user's refresh token", async () => {
-    const owner = await createUser()
-    const other = await createUser()
-    const refreshToken = await createToken(owner._id, 'refresh', 60_000)
-
-    await request(app).post('/api/auth/logout').set('Authorization', bearer(other)).send({ refreshToken })
-    expect((await request(app).post('/api/auth/refresh').send({ refreshToken })).status).toBe(200)
+    expect((await request(app).post('/api/auth/logout').send({})).status).toBe(400)
   })
 })

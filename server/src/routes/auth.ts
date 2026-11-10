@@ -8,7 +8,7 @@ import type { GoogleIdentity } from '../lib/google.js'
 import { signAccessToken } from '../lib/session.js'
 import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
 import { requireAuth } from '../middleware/requireAuth.js'
-import { AuthToken, consumeToken, createToken, hashToken, revokeRefreshTokens } from '../models/authToken.js'
+import { AuthToken, consumeToken, createdRecently, createToken, hashToken, revokeRefreshTokens } from '../models/authToken.js'
 import { User } from '../models/user.js'
 
 const BCRYPT_ROUNDS = 12
@@ -24,10 +24,10 @@ const DUMMY_HASH = bcrypt.hashSync('teraphobia-dummy-password', BCRYPT_ROUNDS)
 
 type UserDoc = InstanceType<typeof User>
 
-function createLimiter() {
+function createLimiter(limit = 20) {
   return rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 20,
+    limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { error: 'Too many attempts, try again later' },
@@ -37,6 +37,7 @@ function createLimiter() {
 // Email failures are logged, never surfaced: the user can ask for a new link.
 async function emailVerificationLink(user: UserDoc) {
   try {
+    if (await createdRecently(user._id, 'verify', VERIFY_TOKEN_TTL_MS)) return
     const token = await createToken(user._id, 'verify', VERIFY_TOKEN_TTL_MS)
     await sendVerificationEmail(user.email, token)
   } catch (err) {
@@ -75,7 +76,7 @@ async function register(req: Request, res: Response) {
     res.status(400).json({ error: invalidPassword })
     return
   }
-  const name = validDisplayName(displayName === undefined ? email.split('@')[0] : displayName)
+  const name = validDisplayName(displayName === undefined ? email.split('@')[0].slice(0, 32) : displayName)
   if (!name) {
     res.status(400).json({ error: 'Display name must be 1 to 32 characters' })
     return
@@ -142,6 +143,11 @@ async function findOrCreateGoogleUser(identity: GoogleIdentity): Promise<UserDoc
   if (existing) {
     // Already linked to a different Google account.
     if (existing.googleId) return null
+    // Whoever registered an unverified account may not own the email, so their password and sessions end here.
+    if (!existing.emailVerified) {
+      existing.passwordHash = undefined
+      await revokeRefreshTokens(existing._id)
+    }
     existing.googleId = identity.googleId
     existing.emailVerified = true
     return existing.save()
@@ -202,9 +208,9 @@ async function logout(req: Request, res: Response) {
     res.status(400).json({ error: 'refreshToken is required' })
     return
   }
-  // Only the caller's own token can be revoked.
+  // The refresh token is the proof, so an idle client with an expired access token can still log out.
   await AuthToken.updateOne(
-    { tokenHash: hashToken(refreshToken), type: 'refresh', userId: req.userId, usedAt: null },
+    { tokenHash: hashToken(refreshToken), type: 'refresh', usedAt: null },
     { usedAt: new Date() },
   )
   res.status(204).end()
@@ -213,7 +219,7 @@ async function logout(req: Request, res: Response) {
 // Same answer whether or not the email is registered.
 async function forgotPassword(req: Request, res: Response) {
   const user = await User.findOne({ email: normalizeEmail(req.body?.email) })
-  if (user?.passwordHash) {
+  if (user?.passwordHash && !(await createdRecently(user._id, 'reset', RESET_TOKEN_TTL_MS))) {
     try {
       const token = await createToken(user._id, 'reset', RESET_TOKEN_TTL_MS)
       await sendPasswordResetEmail(user.email, token)
@@ -238,6 +244,8 @@ async function resetPassword(req: Request, res: Response) {
   }
   await User.updateOne({ _id: token.userId }, { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) })
   await revokeRefreshTokens(token.userId)
+  // Any other reset links sent before this one stop working too.
+  await AuthToken.deleteMany({ userId: token.userId, type: 'reset' })
   res.json({ message: 'Password updated, sign in again' })
 }
 
@@ -264,24 +272,26 @@ async function changePassword(req: Request, res: Response) {
   user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
   await user.save()
   await revokeRefreshTokens(user._id)
+  await AuthToken.deleteMany({ userId: user._id, type: 'reset' })
   await sendSession(res, 200, user)
 }
 
-// A factory so every app (and every test) gets its own rate limiter.
+// A factory so every app (and every test) gets its own rate limiters.
+// Each route has its own limiter, so players sharing one campus IP don't use up each other's attempts.
 export function createAuthRouter() {
   const router = Router()
-  const limiter = createLimiter()
 
-  router.post('/register', limiter, register)
-  router.post('/login', limiter, login)
-  router.post('/verify', limiter, verify)
-  router.post('/resend-verification', limiter, resendVerification)
-  router.post('/google', limiter, googleSignIn)
+  router.post('/register', createLimiter(), register)
+  router.post('/login', createLimiter(), login)
+  router.post('/verify', createLimiter(), verify)
+  // The email routes get a lower limit because Resend's free tier sends only 100 a day.
+  router.post('/resend-verification', createLimiter(5), resendVerification)
+  router.post('/google', createLimiter(), googleSignIn)
   router.post('/refresh', refresh)
-  router.post('/logout', requireAuth, logout)
-  router.post('/forgot-password', limiter, forgotPassword)
-  router.post('/reset-password', limiter, resetPassword)
-  router.post('/change-password', requireAuth, limiter, changePassword)
+  router.post('/logout', logout)
+  router.post('/forgot-password', createLimiter(5), forgotPassword)
+  router.post('/reset-password', createLimiter(), resetPassword)
+  router.post('/change-password', requireAuth, createLimiter(), changePassword)
 
   return router
 }

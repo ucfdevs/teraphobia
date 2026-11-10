@@ -47,7 +47,7 @@ describe('POST /api/auth/google', () => {
   })
 
   it('links a password account with the same email instead of duplicating it', async () => {
-    const existing = await createUser({ email: 'linked@example.com' })
+    const existing = await createUser({ email: 'linked@example.com', emailVerified: true })
     googleReturns({ googleId: 'g-link', email: 'linked@example.com' })
 
     const res = await request(app).post('/api/auth/google').send({ idToken: 'token' })
@@ -57,6 +57,18 @@ describe('POST /api/auth/google', () => {
     const user = await User.findById(existing.id)
     expect(user).toMatchObject({ googleId: 'g-link', emailVerified: true })
     expect(user!.passwordHash).toBe(existing.passwordHash)
+  })
+
+  it('ends the password and sessions of an unverified account it links', async () => {
+    const reg = await request(app).post('/api/auth/register').send({ email: 'squatted@example.com', password: 'squatter-pass' })
+    googleReturns({ googleId: 'g-owner', email: 'squatted@example.com' })
+
+    const res = await request(app).post('/api/auth/google').send({ idToken: 'token' })
+    expect(res.status).toBe(200)
+    expect(res.body.user.id).toBe(reg.body.user.id)
+    expect((await User.findById(reg.body.user.id))!.passwordHash).toBeUndefined()
+    expect((await request(app).post('/api/auth/login').send({ email: 'squatted@example.com', password: 'squatter-pass' })).status).toBe(401)
+    expect((await request(app).post('/api/auth/refresh').send({ refreshToken: reg.body.refreshToken })).status).toBe(401)
   })
 
   it('rejects an invalid or expired token with 401', async () => {
