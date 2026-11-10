@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ServerError",
+  "description": "Server to one, event `error`. Sent when the server rejects a client event. The code drives client behavior; the message is for display and logs.",
+  "type": "object",
+  "properties": {
+    "code": {
+      "title": "ErrorCode",
+      "type": "string",
+      "enum": [
+        "invalid_payload",
+        "room_not_found",
+        "room_full",
+        "game_started",
+        "name_taken",
+        "invalid_rejoin_token",
+        "not_host",
+        "not_enough_players",
+        "wrong_phase",
+        "not_allowed",
+        "invalid_target",
+        "power_used",
+        "rate_limited",
+        "internal"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event": {
+      "description": "The client event that caused the error, such as `room:join`.",
+      "type": "string"
+    }
+  },
+  "required": ["code", "message"],
+  "additionalProperties": false
+}

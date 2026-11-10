@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GameOver",
+  "description": "Server to all, event `game:over`. Reveals the Monster, its type, the winner, and every Villager's night hunches.",
+  "type": "object",
+  "properties": {
+    "winner": { "$ref": "../common.schema.json#/definitions/Winner" },
+    "endReason": { "$ref": "../common.schema.json#/definitions/EndReason" },
+    "rounds": { "$ref": "../common.schema.json#/definitions/Round" },
+    "monster": {
+      "type": "object",
+      "properties": {
+        "seatId": { "$ref": "../common.schema.json#/definitions/SeatId" },
+        "monsterType": { "$ref": "../common.schema.json#/definitions/MonsterType" }
+      },
+      "required": ["seatId", "monsterType"],
+      "additionalProperties": false
+    },
+    "hunches": {
+      "description": "One entry per night hunch submitted. Missed nights have no entry.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/Hunch" }
+    }
+  },
+  "required": ["winner", "endReason", "rounds", "monster", "hunches"],
+  "additionalProperties": false,
+  "definitions": {
+    "Hunch": {
+      "type": "object",
+      "properties": {
+        "seatId": {
+          "description": "The Villager who answered \"Who do you suspect?\".",
+          "$ref": "../common.schema.json#/definitions/SeatId"
+        },
+        "round": { "$ref": "../common.schema.json#/definitions/Round" },
+        "suspectId": { "$ref": "../common.schema.json#/definitions/SeatId" }
+      },
+      "required": ["seatId", "round", "suspectId"],
+      "additionalProperties": false
+    }
+  }
+}

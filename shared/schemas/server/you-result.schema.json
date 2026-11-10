@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "YouResult",
+  "description": "Server to one, event `you:result`. Private result of the player's Day action, sent when Day ends. Blocked and faked results look exactly like normal ones. Client text: Search null = \"You found nothing\", Commune null = \"The dead are silent\", Candle blocked = \"The Monster blocked your candle\".",
+  "type": "object",
+  "properties": {
+    "round": { "$ref": "../common.schema.json#/definitions/Round" },
+    "action": { "$ref": "../common.schema.json#/definitions/DayAction" },
+    "trait": {
+      "description": "Search and Commune only. Search: a trait the Monster has. Commune: a trait the Monster does not have. Null when nothing was found.",
+      "anyOf": [
+        { "$ref": "../common.schema.json#/definitions/Trait" },
+        { "type": "null" }
+      ]
+    },
+    "candleBlocked": {
+      "description": "Candle only. Sent as false for a normal candle so every Candle gets a result. A save itself is never reported.",
+      "type": "boolean"
+    }
+  },
+  "required": ["round", "action"],
+  "additionalProperties": false,
+  "if": {
+    "properties": { "action": { "const": "candle" } }
+  },
+  "then": {
+    "required": ["candleBlocked"],
+    "not": { "required": ["trait"] }
+  },
+  "else": {
+    "required": ["trait"],
+    "not": { "required": ["candleBlocked"] }
+  }
+}
