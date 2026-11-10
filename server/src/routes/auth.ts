@@ -2,19 +2,21 @@ import bcrypt from 'bcrypt'
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { rateLimit } from 'express-rate-limit'
-import { sendVerificationEmail } from '../lib/email.js'
+import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js'
 import { verifyGoogleIdToken } from '../lib/google.js'
 import type { GoogleIdentity } from '../lib/google.js'
 import { signAccessToken } from '../lib/session.js'
 import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
 import { requireAuth } from '../middleware/requireAuth.js'
-import { AuthToken, consumeToken, createToken, hashToken } from '../models/authToken.js'
+import { AuthToken, consumeToken, createToken, hashToken, revokeRefreshTokens } from '../models/authToken.js'
 import { User } from '../models/user.js'
 
 const BCRYPT_ROUNDS = 12
 const MONGO_DUPLICATE_KEY = 11000
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000
+const FORGOT_PASSWORD_MESSAGE = 'If that email has a password account, a reset link is on its way'
 const RESEND_VERIFICATION_MESSAGE = 'If that account needs verifying, a new link is on its way'
 
 // Compared against when the account doesn't exist, so response time doesn't reveal which emails are registered.
@@ -208,6 +210,63 @@ async function logout(req: Request, res: Response) {
   res.status(204).end()
 }
 
+// Same answer whether or not the email is registered.
+async function forgotPassword(req: Request, res: Response) {
+  const user = await User.findOne({ email: normalizeEmail(req.body?.email) })
+  if (user?.passwordHash) {
+    try {
+      const token = await createToken(user._id, 'reset', RESET_TOKEN_TTL_MS)
+      await sendPasswordResetEmail(user.email, token)
+    } catch (err) {
+      console.error('Could not send password reset email', err)
+    }
+  }
+  res.json({ message: FORGOT_PASSWORD_MESSAGE })
+}
+
+async function resetPassword(req: Request, res: Response) {
+  const { token: rawToken, password } = req.body ?? {}
+  const invalidPassword = passwordError(password)
+  if (invalidPassword) {
+    res.status(400).json({ error: invalidPassword })
+    return
+  }
+  const token = await consumeToken(rawToken, 'reset')
+  if (!token) {
+    res.status(400).json({ error: 'This link is invalid or has expired' })
+    return
+  }
+  await User.updateOne({ _id: token.userId }, { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) })
+  await revokeRefreshTokens(token.userId)
+  res.json({ message: 'Password updated, sign in again' })
+}
+
+// Ends every other session and returns a fresh one, so only this client stays signed in.
+async function changePassword(req: Request, res: Response) {
+  const { currentPassword, newPassword } = req.body ?? {}
+  if (typeof currentPassword !== 'string') {
+    res.status(400).json({ error: 'currentPassword is required' })
+    return
+  }
+  const invalidPassword = passwordError(newPassword)
+  if (invalidPassword) {
+    res.status(400).json({ error: invalidPassword })
+    return
+  }
+
+  const user = await User.findById(req.userId)
+  const matches = await bcrypt.compare(currentPassword, user?.passwordHash ?? DUMMY_HASH)
+  if (!user?.passwordHash || !matches) {
+    res.status(401).json({ error: 'Current password is incorrect' })
+    return
+  }
+
+  user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+  await user.save()
+  await revokeRefreshTokens(user._id)
+  await sendSession(res, 200, user)
+}
+
 // A factory so every app (and every test) gets its own rate limiter.
 export function createAuthRouter() {
   const router = Router()
@@ -220,6 +279,9 @@ export function createAuthRouter() {
   router.post('/google', limiter, googleSignIn)
   router.post('/refresh', refresh)
   router.post('/logout', requireAuth, logout)
+  router.post('/forgot-password', limiter, forgotPassword)
+  router.post('/reset-password', limiter, resetPassword)
+  router.post('/change-password', requireAuth, limiter, changePassword)
 
   return router
 }
