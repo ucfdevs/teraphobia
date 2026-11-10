@@ -1,0 +1,24 @@
+meta {
+  name: Get me
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/users/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns the profile without secrets", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().email).to.equal(bru.getEnvVar("email"));
+    expect(res.getBody().signInMethods).to.include("password");
+    expect(res.getBody()).to.not.have.property("passwordHash");
+  });
+}

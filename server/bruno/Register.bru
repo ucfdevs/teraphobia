@@ -12,8 +12,8 @@ post {
 
 body:json {
   {
-    "email": "{{bruno@example.com}}",
-    "password": "{{something}}",
+    "email": "{{email}}",
+    "password": "{{password}}",
     "displayName": "Bruno Test"
   }
 }
@@ -30,7 +30,7 @@ tests {
     expect(res.getBody().user.email).to.equal(bru.getEnvVar("email"));
     expect(res.getBody().user.emailVerified).to.equal(false);
   });
-  
+
   test("never returns the password hash", function () {
     expect(res.getBody().user).to.not.have.property("passwordHash");
   });
