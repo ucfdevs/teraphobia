@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import LoginForm from './components/LoginForm';
+import LandingPage from './pages/LandingPage';
 import logo from './assets/logo.svg';
 import './App.css';
 import RegisterForm from './components/RegisterForm';
@@ -12,7 +13,7 @@ interface User {
 }
 
 export default function App() {
-  const [view, setView] = useState<'login' | 'register' | 'app'>('login');
+  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app'>('landing');
 
   // Form fields
   const [name, setName] = useState('');
@@ -37,6 +38,20 @@ export default function App() {
     setPassword('');
     setErrorMsg('');
     setSuccessMsg('');
+  };
+
+  const handleHostGame = () => {
+    if (currentUser) {
+      setView('app');
+    } else {
+      resetForm();
+      setView('login');
+    }
+  };
+
+  const handleSignInNav = () => {
+    resetForm();
+    setView('login');
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -114,7 +129,7 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     resetForm();
-    setView('login');
+    setView('landing');
   };
 
   const rolesData = [
@@ -139,9 +154,25 @@ export default function App() {
       </div>
 
       <header className="brand-header">
-        <img src={logo} alt="Teraphobia Logo" className="brand-logo" />
+        <button
+          type="button"
+          onClick={() => setView('landing')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          aria-label="Return to home page"
+        >
+          <img src={logo} alt="Teraphobia Logo" className="brand-logo" />
+        </button>
         <p className="brand-subtitle">Halloween Social Deduction System</p>
       </header>
+      {/* LANDING VIEW */}
+      {view === 'landing' && (
+        <LandingPage
+          isAuthenticated={!!currentUser}
+          onHostGame={handleHostGame}
+          onSignIn={handleSignInNav}
+        />
+      )}
+
       {/* LOGIN VIEW */}
       {view === 'login' && (
         <div className="auth-card">
@@ -151,8 +182,8 @@ export default function App() {
           {successMsg && <div className="alert-success">{successMsg}</div>}
 
           <LoginForm email={email} password={password} loading={loading}
-          onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin}/>
-        
+            onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleLogin} />
+
           <div className="card-footer">
             Need an account?
             <button
@@ -165,9 +196,9 @@ export default function App() {
           </div>
         </div>
       )
-      
+
       }
-        
+
       {/* REGISTER VIEW */}
       {view === 'register' && (
         <div className="auth-card">
@@ -176,7 +207,7 @@ export default function App() {
           {errorMsg && <div className="alert-error">{errorMsg}</div>}
 
           <RegisterForm name={name} email={email} password={password} loading={loading}
-          onNameChange={setName} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleRegister} />
+            onNameChange={setName} onEmailChange={setEmail} onPasswordChange={setPassword} onSubmit={handleRegister} />
 
           <div className="card-footer">
             Already registered?
