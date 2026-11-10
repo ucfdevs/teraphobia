@@ -375,6 +375,9 @@ body {
    ========================================================================== */
 
 .landing-container {
+  /* Sits above the fixed fog layer, like .dashboard-card */
+  position: relative;
+  z-index: 10;
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;

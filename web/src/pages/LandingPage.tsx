@@ -20,7 +20,7 @@ export default function LandingPage({
                 <p className="landing-pitch">
                     Teraphobia is a Halloween social deduction party game for 4 to 8 players in one room.
                     A shared host screen runs the town's fate while each player uses their phone as a private controller
-                    to gather clues, cast spells, and root out the imposter.
+                    to gather clues, light candles, and root out the Monster.
                 </p>
 
                 {/* Action CTAs */}
