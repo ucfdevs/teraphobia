@@ -1,0 +1,16 @@
+{
+  "name": "teraphobia-shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "check": "node scripts/generate.mjs --check"
+  },
+  "devDependencies": {
+    "quicktype": "23.0.170"
+  }
+}
