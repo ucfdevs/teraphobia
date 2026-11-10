@@ -1,6 +1,7 @@
 import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import { createAuthRouter } from './routes/auth.js'
+import { createGamesRouter } from './routes/games.js'
 import { createRoomsRouter } from './routes/rooms.js'
 import { createUsersRouter } from './routes/users.js'
 
@@ -13,6 +14,7 @@ export function createApp() {
   app.use('/api/auth', createAuthRouter())
   app.use('/api/users', createUsersRouter())
   app.use('/api/rooms', createRoomsRouter())
+  app.use('/api/games', createGamesRouter())
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' })

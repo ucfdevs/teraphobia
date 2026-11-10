@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { myGames } from './games.js'
 import { User } from '../models/user.js'
 import { validDisplayName } from '../lib/validation.js'
 
@@ -69,5 +70,6 @@ export function createUsersRouter() {
   router.use(requireAuth)
   router.get('/me', getMe)
   router.patch('/me', updateMe)
+  router.get('/me/games', myGames)
   return router
 }
