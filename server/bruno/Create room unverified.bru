@@ -1,0 +1,27 @@
+meta {
+  name: Create room unverified
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/rooms
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "preset": "normal"
+  }
+}
+
+tests {
+  test("a new, unverified account can't host", function () {
+    expect(res.getStatus()).to.equal(403);
+  });
+}

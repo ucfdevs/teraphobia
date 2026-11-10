@@ -1,0 +1,28 @@
+meta {
+  name: My games
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/users/me/games?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns a page of history", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().games).to.be.an("array");
+    expect(res.getBody().page).to.equal(1);
+  });
+}

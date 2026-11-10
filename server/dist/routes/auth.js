@@ -1,41 +1,50 @@
 import bcrypt from 'bcrypt';
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import jwt from 'jsonwebtoken';
+import { sendPasswordResetEmail, sendVerificationEmail } from '../lib/email.js';
+import { verifyGoogleIdToken } from '../lib/google.js';
+import { signAccessToken } from '../lib/session.js';
+import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { AuthToken, consumeToken, createdRecently, createToken, hashToken, revokeRefreshTokens } from '../models/authToken.js';
 import { User } from '../models/user.js';
 const BCRYPT_ROUNDS = 12;
-const ACCESS_TOKEN_TTL = '15m';
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MONGO_DUPLICATE_KEY = 11000;
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const FORGOT_PASSWORD_MESSAGE = 'If that email has a password account, a reset link is on its way';
+const RESEND_VERIFICATION_MESSAGE = 'If that account needs verifying, a new link is on its way';
 // Compared against when the account doesn't exist, so response time doesn't reveal which emails are registered.
 const DUMMY_HASH = bcrypt.hashSync('teraphobia-dummy-password', BCRYPT_ROUNDS);
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 20,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    message: { error: 'Too many attempts, try again later' },
-});
-function normalizeEmail(value) {
-    return typeof value === 'string' ? value.trim().toLowerCase() : '';
-}
-function passwordError(value) {
-    if (typeof value !== 'string')
-        return 'Password is required';
-    if (value.length < 8)
-        return 'Password must be at least 8 characters';
-    // bcrypt ignores everything past 72 bytes.
-    if (Buffer.byteLength(value) > 72)
-        return 'Password must be at most 72 bytes';
-    return null;
-}
-function sendSession(res, status, user) {
-    const accessToken = jwt.sign({}, process.env.JWT_SECRET, {
-        subject: user.id,
-        expiresIn: ACCESS_TOKEN_TTL,
+function createLimiter(limit = 20) {
+    return rateLimit({
+        windowMs: 15 * 60 * 1000,
+        limit,
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        message: { error: 'Too many attempts, try again later' },
     });
+}
+// Email failures are logged, never surfaced: the user can ask for a new link.
+async function emailVerificationLink(user) {
+    try {
+        if (await createdRecently(user._id, 'verify', VERIFY_TOKEN_TTL_MS))
+            return;
+        const token = await createToken(user._id, 'verify', VERIFY_TOKEN_TTL_MS);
+        await sendVerificationEmail(user.email, token);
+    }
+    catch (err) {
+        console.error('Could not send verification email', err);
+    }
+}
+// The session response for register, login, refresh, and Google sign in.
+async function sendSession(res, status, user) {
+    const accessToken = signAccessToken(user.id);
+    const refreshToken = await createToken(user._id, 'refresh', REFRESH_TOKEN_TTL_MS);
     res.status(status).json({
         accessToken,
+        refreshToken,
         user: {
             id: user.id,
             email: user.email,
@@ -57,15 +66,16 @@ async function register(req, res) {
         res.status(400).json({ error: invalidPassword });
         return;
     }
-    const name = displayName === undefined ? email.split('@')[0] : displayName;
-    if (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 32) {
+    const name = validDisplayName(displayName === undefined ? email.split('@')[0].slice(0, 32) : displayName);
+    if (!name) {
         res.status(400).json({ error: 'Display name must be 1 to 32 characters' });
         return;
     }
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     try {
-        const user = await User.create({ email, passwordHash, displayName: name.trim() });
-        sendSession(res, 201, user);
+        const user = await User.create({ email, passwordHash, displayName: name });
+        await emailVerificationLink(user);
+        await sendSession(res, 201, user);
     }
     catch (err) {
         if (err.code === MONGO_DUPLICATE_KEY) {
@@ -89,8 +99,171 @@ async function login(req, res) {
         res.status(401).json({ error: 'Invalid email or password' });
         return;
     }
-    sendSession(res, 200, user);
+    await sendSession(res, 200, user);
 }
-export const authRouter = Router();
-authRouter.post('/register', limiter, register);
-authRouter.post('/login', limiter, login);
+async function verify(req, res) {
+    const token = await consumeToken(req.body?.token, 'verify');
+    if (!token) {
+        res.status(400).json({ error: 'This link is invalid or has expired' });
+        return;
+    }
+    await User.updateOne({ _id: token.userId }, { emailVerified: true });
+    res.json({ message: 'Email verified' });
+}
+// Same answer whether or not the email is registered.
+async function resendVerification(req, res) {
+    const user = await User.findOne({ email: normalizeEmail(req.body?.email) });
+    if (user && !user.emailVerified)
+        await emailVerificationLink(user);
+    res.json({ message: RESEND_VERIFICATION_MESSAGE });
+}
+// Finds the user for a Google identity: by googleId, else links the account with the same email, else creates one.
+async function findOrCreateGoogleUser(identity) {
+    const email = normalizeEmail(identity.email);
+    const linked = await User.findOne({ googleId: identity.googleId });
+    if (linked)
+        return linked;
+    const existing = await User.findOne({ email });
+    if (existing) {
+        // Already linked to a different Google account.
+        if (existing.googleId)
+            return null;
+        // Whoever registered an unverified account may not own the email, so their password and sessions end here.
+        if (!existing.emailVerified) {
+            existing.passwordHash = undefined;
+            await revokeRefreshTokens(existing._id);
+        }
+        existing.googleId = identity.googleId;
+        existing.emailVerified = true;
+        return existing.save();
+    }
+    const displayName = validDisplayName(identity.name?.slice(0, 32)) ?? validDisplayName(email.split('@')[0].slice(0, 32)) ?? 'Player';
+    try {
+        return await User.create({ email, googleId: identity.googleId, emailVerified: true, displayName });
+    }
+    catch (err) {
+        // Another request created the account first; link to it instead.
+        if (err.code === MONGO_DUPLICATE_KEY)
+            return findOrCreateGoogleUser(identity);
+        throw err;
+    }
+}
+async function googleSignIn(req, res) {
+    const { idToken } = req.body ?? {};
+    if (typeof idToken !== 'string' || !idToken) {
+        res.status(400).json({ error: 'idToken is required' });
+        return;
+    }
+    let identity;
+    try {
+        identity = await verifyGoogleIdToken(idToken);
+    }
+    catch {
+        res.status(401).json({ error: 'Invalid or expired Google token' });
+        return;
+    }
+    // An unverified Google email must never take over a password account.
+    if (!identity.emailVerified) {
+        res.status(401).json({ error: 'Google account email is not verified' });
+        return;
+    }
+    const user = await findOrCreateGoogleUser(identity);
+    if (!user) {
+        res.status(409).json({ error: 'This email is linked to a different Google account' });
+        return;
+    }
+    await sendSession(res, 200, user);
+}
+// Rotates the refresh token: the old one is used up and a new pair comes back.
+async function refresh(req, res) {
+    const token = await consumeToken(req.body?.refreshToken, 'refresh');
+    const user = token && (await User.findById(token.userId));
+    if (!user) {
+        res.status(401).json({ error: 'Invalid or expired refresh token' });
+        return;
+    }
+    await sendSession(res, 200, user);
+}
+async function logout(req, res) {
+    const { refreshToken } = req.body ?? {};
+    if (typeof refreshToken !== 'string' || !refreshToken) {
+        res.status(400).json({ error: 'refreshToken is required' });
+        return;
+    }
+    // The refresh token is the proof, so an idle client with an expired access token can still log out.
+    await AuthToken.updateOne({ tokenHash: hashToken(refreshToken), type: 'refresh', usedAt: null }, { usedAt: new Date() });
+    res.status(204).end();
+}
+// Same answer whether or not the email is registered.
+async function forgotPassword(req, res) {
+    const user = await User.findOne({ email: normalizeEmail(req.body?.email) });
+    if (user?.passwordHash && !(await createdRecently(user._id, 'reset', RESET_TOKEN_TTL_MS))) {
+        try {
+            const token = await createToken(user._id, 'reset', RESET_TOKEN_TTL_MS);
+            await sendPasswordResetEmail(user.email, token);
+        }
+        catch (err) {
+            console.error('Could not send password reset email', err);
+        }
+    }
+    res.json({ message: FORGOT_PASSWORD_MESSAGE });
+}
+async function resetPassword(req, res) {
+    const { token: rawToken, password } = req.body ?? {};
+    const invalidPassword = passwordError(password);
+    if (invalidPassword) {
+        res.status(400).json({ error: invalidPassword });
+        return;
+    }
+    const token = await consumeToken(rawToken, 'reset');
+    if (!token) {
+        res.status(400).json({ error: 'This link is invalid or has expired' });
+        return;
+    }
+    await User.updateOne({ _id: token.userId }, { passwordHash: await bcrypt.hash(password, BCRYPT_ROUNDS) });
+    await revokeRefreshTokens(token.userId);
+    // Any other reset links sent before this one stop working too.
+    await AuthToken.deleteMany({ userId: token.userId, type: 'reset' });
+    res.json({ message: 'Password updated, sign in again' });
+}
+// Ends every other session and returns a fresh one, so only this client stays signed in.
+async function changePassword(req, res) {
+    const { currentPassword, newPassword } = req.body ?? {};
+    if (typeof currentPassword !== 'string') {
+        res.status(400).json({ error: 'currentPassword is required' });
+        return;
+    }
+    const invalidPassword = passwordError(newPassword);
+    if (invalidPassword) {
+        res.status(400).json({ error: invalidPassword });
+        return;
+    }
+    const user = await User.findById(req.userId);
+    const matches = await bcrypt.compare(currentPassword, user?.passwordHash ?? DUMMY_HASH);
+    if (!user?.passwordHash || !matches) {
+        res.status(401).json({ error: 'Current password is incorrect' });
+        return;
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    await user.save();
+    await revokeRefreshTokens(user._id);
+    await AuthToken.deleteMany({ userId: user._id, type: 'reset' });
+    await sendSession(res, 200, user);
+}
+// A factory so every app (and every test) gets its own rate limiters.
+// Each route has its own limiter, so players sharing one campus IP don't use up each other's attempts.
+export function createAuthRouter() {
+    const router = Router();
+    router.post('/register', createLimiter(), register);
+    router.post('/login', createLimiter(), login);
+    router.post('/verify', createLimiter(), verify);
+    // The email routes get a lower limit because Resend's free tier sends only 100 a day.
+    router.post('/resend-verification', createLimiter(5), resendVerification);
+    router.post('/google', createLimiter(), googleSignIn);
+    router.post('/refresh', refresh);
+    router.post('/logout', logout);
+    router.post('/forgot-password', createLimiter(5), forgotPassword);
+    router.post('/reset-password', createLimiter(), resetPassword);
+    router.post('/change-password', requireAuth, createLimiter(), changePassword);
+    return router;
+}
