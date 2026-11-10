@@ -2,7 +2,7 @@ import logo from '../assets/logo.svg';
 import LobbyUser from '../components/LobbyUser';
 import "./lobby.css"
 
-function Lobby() {
+export default function LobbyPage() {
     
 
     /**
@@ -29,7 +29,9 @@ function Lobby() {
 
     function GetLobbyCode() {
         const code = '123456'
-        // Uses API to get the lobby code 
+
+        // !!! --- Uses API to get the lobby code
+
         return SanitizeLobbyCode(code);
     }
     
@@ -38,7 +40,6 @@ function Lobby() {
     //var userList: ReactNode[];
     return (
         <>
-
         <div id="lobbyheader">
             <img id='logo' src={logo}></img>
             <div id='codeheader'>
@@ -52,11 +53,13 @@ function Lobby() {
             <div className='usernameHeader'>Username</div>
             <div className='seperator'></div>
         </div>
-        <div id="userlist">
+        <div className="user-list">
+            <LobbyUser username='Example' profileSrc='sanitized'/>
+            <LobbyUser username='Example' profileSrc='sanitized'/>
+            <LobbyUser username='Example' profileSrc='sanitized'/>
             <LobbyUser username='Example' profileSrc='sanitized'/>
         </div>
         <button className='start-game-button'>Start Game</button>
         </>
     )
 }
-export default Lobby;

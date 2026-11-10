@@ -11,11 +11,12 @@
     margin-left: 5%;
 }
 
-#userlist {
+.user-list {
     display: flex;
     width: 90%;
     height: 500px;
     margin-left: 5%;
+    flex-direction: column;
 }
 
 .start-game-button {
