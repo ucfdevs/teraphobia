@@ -1,6 +1,7 @@
 import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import { createAuthRouter } from './routes/auth.js'
+import { createUsersRouter } from './routes/users.js'
 
 export function createApp() {
   const app = express()
@@ -9,6 +10,7 @@ export function createApp() {
   app.set('trust proxy', 1)
   app.use(express.json())
   app.use('/api/auth', createAuthRouter())
+  app.use('/api/users', createUsersRouter())
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' })

@@ -2,12 +2,11 @@ import bcrypt from 'bcrypt'
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { rateLimit } from 'express-rate-limit'
-import jwt from 'jsonwebtoken'
+import { signAccessToken } from '../lib/session.js'
+import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
 import { User } from '../models/user.js'
 
 const BCRYPT_ROUNDS = 12
-const ACCESS_TOKEN_TTL = '15m'
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MONGO_DUPLICATE_KEY = 11000
 
 // Compared against when the account doesn't exist, so response time doesn't reveal which emails are registered.
@@ -25,23 +24,8 @@ function createLimiter() {
   })
 }
 
-function normalizeEmail(value: unknown) {
-  return typeof value === 'string' ? value.trim().toLowerCase() : ''
-}
-
-function passwordError(value: unknown) {
-  if (typeof value !== 'string') return 'Password is required'
-  if (value.length < 8) return 'Password must be at least 8 characters'
-  // bcrypt ignores everything past 72 bytes.
-  if (Buffer.byteLength(value) > 72) return 'Password must be at most 72 bytes'
-  return null
-}
-
 function sendSession(res: Response, status: number, user: UserDoc) {
-  const accessToken = jwt.sign({}, process.env.JWT_SECRET!, {
-    subject: user.id,
-    expiresIn: ACCESS_TOKEN_TTL,
-  })
+  const accessToken = signAccessToken(user.id)
   res.status(status).json({
     accessToken,
     user: {
@@ -68,15 +52,15 @@ async function register(req: Request, res: Response) {
     res.status(400).json({ error: invalidPassword })
     return
   }
-  const name = displayName === undefined ? email.split('@')[0] : displayName
-  if (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 32) {
+  const name = validDisplayName(displayName === undefined ? email.split('@')[0] : displayName)
+  if (!name) {
     res.status(400).json({ error: 'Display name must be 1 to 32 characters' })
     return
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
   try {
-    const user = await User.create({ email, passwordHash, displayName: name.trim() })
+    const user = await User.create({ email, passwordHash, displayName: name })
     sendSession(res, 201, user)
   } catch (err) {
     if ((err as { code?: number }).code === MONGO_DUPLICATE_KEY) {
