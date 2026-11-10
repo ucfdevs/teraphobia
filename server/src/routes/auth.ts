@@ -5,12 +5,14 @@ import { rateLimit } from 'express-rate-limit'
 import { sendVerificationEmail } from '../lib/email.js'
 import { signAccessToken } from '../lib/session.js'
 import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
-import { consumeToken, createToken } from '../models/authToken.js'
+import { requireAuth } from '../middleware/requireAuth.js'
+import { AuthToken, consumeToken, createToken, hashToken } from '../models/authToken.js'
 import { User } from '../models/user.js'
 
 const BCRYPT_ROUNDS = 12
 const MONGO_DUPLICATE_KEY = 11000
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const RESEND_VERIFICATION_MESSAGE = 'If that account needs verifying, a new link is on its way'
 
 // Compared against when the account doesn't exist, so response time doesn't reveal which emails are registered.
@@ -38,10 +40,13 @@ async function emailVerificationLink(user: UserDoc) {
   }
 }
 
-function sendSession(res: Response, status: number, user: UserDoc) {
+// The session response for register, login, refresh, and Google sign in.
+async function sendSession(res: Response, status: number, user: UserDoc) {
   const accessToken = signAccessToken(user.id)
+  const refreshToken = await createToken(user._id, 'refresh', REFRESH_TOKEN_TTL_MS)
   res.status(status).json({
     accessToken,
+    refreshToken,
     user: {
       id: user.id,
       email: user.email,
@@ -76,7 +81,7 @@ async function register(req: Request, res: Response) {
   try {
     const user = await User.create({ email, passwordHash, displayName: name })
     await emailVerificationLink(user)
-    sendSession(res, 201, user)
+    await sendSession(res, 201, user)
   } catch (err) {
     if ((err as { code?: number }).code === MONGO_DUPLICATE_KEY) {
       res.status(409).json({ error: 'Email is already registered' })
@@ -103,7 +108,7 @@ async function login(req: Request, res: Response) {
     return
   }
 
-  sendSession(res, 200, user)
+  await sendSession(res, 200, user)
 }
 
 async function verify(req: Request, res: Response) {
@@ -123,6 +128,31 @@ async function resendVerification(req: Request, res: Response) {
   res.json({ message: RESEND_VERIFICATION_MESSAGE })
 }
 
+// Rotates the refresh token: the old one is used up and a new pair comes back.
+async function refresh(req: Request, res: Response) {
+  const token = await consumeToken(req.body?.refreshToken, 'refresh')
+  const user = token && (await User.findById(token.userId))
+  if (!user) {
+    res.status(401).json({ error: 'Invalid or expired refresh token' })
+    return
+  }
+  await sendSession(res, 200, user)
+}
+
+async function logout(req: Request, res: Response) {
+  const { refreshToken } = req.body ?? {}
+  if (typeof refreshToken !== 'string' || !refreshToken) {
+    res.status(400).json({ error: 'refreshToken is required' })
+    return
+  }
+  // Only the caller's own token can be revoked.
+  await AuthToken.updateOne(
+    { tokenHash: hashToken(refreshToken), type: 'refresh', userId: req.userId, usedAt: null },
+    { usedAt: new Date() },
+  )
+  res.status(204).end()
+}
+
 // A factory so every app (and every test) gets its own rate limiter.
 export function createAuthRouter() {
   const router = Router()
@@ -132,6 +162,8 @@ export function createAuthRouter() {
   router.post('/login', limiter, login)
   router.post('/verify', limiter, verify)
   router.post('/resend-verification', limiter, resendVerification)
+  router.post('/refresh', refresh)
+  router.post('/logout', requireAuth, logout)
 
   return router
 }

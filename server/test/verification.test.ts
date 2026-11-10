@@ -30,7 +30,7 @@ describe('verification on register', () => {
     expect(sendMock).toHaveBeenCalledWith('verify-me@example.com', expect.any(String))
 
     const token = sentToken()
-    const docs = await AuthToken.find({ userId: res.body.user.id }).lean()
+    const docs = await AuthToken.find({ userId: res.body.user.id, type: 'verify' }).lean()
     expect(docs).toHaveLength(1)
     expect(docs[0]).toMatchObject({ type: 'verify', tokenHash: hashToken(token) })
     expect(JSON.stringify(docs)).not.toContain(token)
