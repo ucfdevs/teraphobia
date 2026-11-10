@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "common.schema.json",
+  "title": "Common",
+  "description": "Shared types referenced by the socket event schemas.",
+  "definitions": {
+    "RoomCode": {
+      "description": "4-letter room code shown on the shared screen.",
+      "type": "string",
+      "pattern": "^[A-Z]{4}$"
+    },
+    "DisplayName": {
+      "description": "1 to 16 characters, unique within the room.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16,
+      "pattern": "\\S"
+    },
+    "SeatId": {
+      "description": "Server-assigned id for a player's seat in the room.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "client/night-submit.schema.json",
+  "title": "NightSubmit",
+  "description": "Client to server, event `night:submit`. The Monster picks victims; a Villager names who they suspect. The server checks the sender's role, so both shapes use the same event.",
+  "oneOf": [
+    { "$ref": "#/definitions/MonsterKill" },
+    { "$ref": "#/definitions/VillagerHunch" }
+  ],
+  "definitions": {
+    "MonsterKill": {
+      "description": "Monster only. One victim, or two when the Werewolf uses its power (never on Night 1).",
+      "type": "object",
+      "properties": {
+        "victimIds": {
+          "type": "array",
+          "items": { "$ref": "../common.schema.json#/definitions/SeatId" },
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true
+        }
+      },
+      "required": ["victimIds"],
+      "additionalProperties": false
+    },
+    "VillagerHunch": {
+      "description": "Villager only. Answer to \"Who do you suspect?\". Shown as an end-game stat; it has no effect.",
+      "type": "object",
+      "properties": {
+        "suspectId": { "$ref": "../common.schema.json#/definitions/SeatId" }
+      },
+      "required": ["suspectId"],
+      "additionalProperties": false
+    }
+  }
+}
