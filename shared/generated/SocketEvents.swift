@@ -447,12 +447,12 @@ public extension VoteSubmit {
 /// drives client behavior; the message is for display and logs.
 // MARK: - ServerError
 public struct ServerError: Codable, Equatable {
-    public let code: Code
+    public let code: ErrorCode
     /// The client event that caused the error, such as `room:join`.
     public let event: String?
     public let message: String
 
-    public init(code: Code, event: String?, message: String) {
+    public init(code: ErrorCode, event: String?, message: String) {
         self.code = code
         self.event = event
         self.message = message
@@ -478,7 +478,7 @@ public extension ServerError {
     }
 
     func with(
-        code: Code? = nil,
+        code: ErrorCode? = nil,
         event: String?? = nil,
         message: String? = nil
     ) -> ServerError {
@@ -498,8 +498,8 @@ public extension ServerError {
     }
 }
 
-public enum Code: String, Codable, Equatable {
-    case codeInternal = "internal"
+public enum ErrorCode: String, Codable, Equatable {
+    case errorCodeInternal = "internal"
     case gameStarted = "game_started"
     case invalidPayload = "invalid_payload"
     case invalidRejoinToken = "invalid_rejoin_token"
@@ -1200,7 +1200,7 @@ public extension Trait {
 
 public enum TraitSlot: String, Codable, Equatable {
     case hat = "hat"
-    case heldItem = "heldItem"
+    case item = "item"
     case mask = "mask"
 }
 
@@ -1361,11 +1361,11 @@ public extension PublicSeat {
 /// Public costume: one option in each of the 3 slots.
 // MARK: - Costume
 public struct Costume: Codable, Equatable {
-    public let hat, heldItem, mask: String
+    public let hat, item, mask: String
 
-    public init(hat: String, heldItem: String, mask: String) {
+    public init(hat: String, item: String, mask: String) {
         self.hat = hat
-        self.heldItem = heldItem
+        self.item = item
         self.mask = mask
     }
 }
@@ -1390,12 +1390,12 @@ public extension Costume {
 
     func with(
         hat: String? = nil,
-        heldItem: String? = nil,
+        item: String? = nil,
         mask: String? = nil
     ) -> Costume {
         return Costume(
             hat: hat ?? self.hat,
-            heldItem: heldItem ?? self.heldItem,
+            item: item ?? self.item,
             mask: mask ?? self.mask
         )
     }

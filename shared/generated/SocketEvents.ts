@@ -83,7 +83,7 @@ export interface VoteSubmit {
  * drives client behavior; the message is for display and logs.
  */
 export interface ServerError {
-    code: Code;
+    code: ErrorCode;
     /**
      * The client event that caused the error, such as `room:join`.
      */
@@ -91,7 +91,7 @@ export interface ServerError {
     message: string;
 }
 
-export type Code = "invalid_payload" | "room_not_found" | "room_full" | "game_started" | "name_taken" | "invalid_rejoin_token" | "not_host" | "not_enough_players" | "wrong_phase" | "not_allowed" | "invalid_target" | "power_used" | "rate_limited" | "internal";
+export type ErrorCode = "invalid_payload" | "room_not_found" | "room_full" | "game_started" | "name_taken" | "invalid_rejoin_token" | "not_host" | "not_enough_players" | "wrong_phase" | "not_allowed" | "invalid_target" | "power_used" | "rate_limited" | "internal";
 
 /**
  * Server to all, event `game:over`. Reveals the Monster, its type, the winner, and every
@@ -245,7 +245,7 @@ export interface Trait {
     slot:   TraitSlot;
 }
 
-export type TraitSlot = "hat" | "mask" | "heldItem";
+export type TraitSlot = "hat" | "mask" | "item";
 
 /**
  * Server to all, event `room:state`. Public room snapshot, sent whenever a seat,
@@ -282,9 +282,9 @@ export interface PublicSeat {
  * Public costume: one option in each of the 3 slots.
  */
 export interface Costume {
-    hat:      string;
-    heldItem: string;
-    mask:     string;
+    hat:  string;
+    item: string;
+    mask: string;
 }
 
 /**

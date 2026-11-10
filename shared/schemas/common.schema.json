@@ -77,7 +77,7 @@
     },
     "TraitSlot": {
       "type": "string",
-      "enum": ["hat", "mask", "heldItem"]
+      "enum": ["hat", "mask", "item"]
     },
     "TraitOption": {
       "description": "Option id within a slot (4 per slot). Switch to enums once the costume art names are final.",
@@ -90,9 +90,9 @@
       "properties": {
         "hat": { "$ref": "#/definitions/TraitOption" },
         "mask": { "$ref": "#/definitions/TraitOption" },
-        "heldItem": { "$ref": "#/definitions/TraitOption" }
+        "item": { "$ref": "#/definitions/TraitOption" }
       },
-      "required": ["hat", "mask", "heldItem"],
+      "required": ["hat", "mask", "item"],
       "additionalProperties": false
     },
     "Trait": {

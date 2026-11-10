@@ -5,6 +5,7 @@
   "type": "object",
   "properties": {
     "code": {
+      "title": "ErrorCode",
       "type": "string",
       "enum": [
         "invalid_payload",

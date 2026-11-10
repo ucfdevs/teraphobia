@@ -9,7 +9,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const sharedDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-const quicktype = join(sharedDir, "node_modules", ".bin", "quicktype");
+// Run quicktype's entry file with node directly, so it also works on Windows (no .bin shim).
+const quicktype = join(sharedDir, "node_modules", "quicktype", "dist", "index.js");
 const checkOnly = process.argv.includes("--check");
 
 // Relative, sorted paths keep the output identical on every machine.
@@ -39,7 +40,7 @@ let stale = [];
 try {
   for (const { file, args } of targets) {
     const out = join(outDir, file);
-    execFileSync(quicktype, ["--src-lang", "schema", ...args, "--out", out, ...schemas], {
+    execFileSync(process.execPath, [quicktype, "--src-lang", "schema", ...args, "--out", out, ...schemas], {
       cwd: sharedDir,
       stdio: ["ignore", "ignore", "inherit"],
     });
