@@ -1,0 +1,26 @@
+.max-players-button-container {
+    display: flex;
+    flex-direction: row;
+}
+.max-players-button {
+    width: 50px;
+    height: 50px;
+    background-color: white;
+    border: none;
+    color: black;
+}
+
+.max-players-button:focus {
+    background-color: red;
+    color: white;
+}
+
+.options-max-players {
+    display: flex;
+    justify-content: left;
+    flex-direction: column;
+}
+
+.max-players-text {
+    text-align: left;
+}
