@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
+import type { GameEngine } from '../game/engine.js'
 import type { Preset } from '../models/game.js'
 
 // Live rooms live in memory only (PRD). The socket handlers in src/sockets use this module.
@@ -23,6 +24,8 @@ export interface Room {
   createdAt: Date
   startedAt?: Date
   seats: Seat[]
+  // Set at Start.
+  game?: GameEngine
 }
 
 export type RoomStatus = 'open' | 'started' | 'full'
