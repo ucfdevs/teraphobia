@@ -4,9 +4,20 @@ import SwiftUI
 struct GameView: View {
     let client: RoomClient
 
+    // Your public status from room:state. Dead and banished players sit out the rest of the game.
+    private var lifeStatus: LifeStatus {
+        client.room?.seats.first { $0.seatID == client.seatID }?.lifeStatus ?? .alive
+    }
+
     var body: some View {
         Group {
-            if let you = client.you, let phase = client.phase {
+            if client.reconnecting {
+                ReconnectingView()
+            } else if let you = client.you, let gameOver = client.gameOver {
+                GameOverView(gameOver: gameOver, you: you, seats: client.room?.seats ?? [], done: client.leave)
+            } else if lifeStatus != .alive {
+                OutView(lifeStatus: lifeStatus)
+            } else if let you = client.you, let phase = client.phase {
                 let seats = client.room?.seats ?? []
                 switch phase.phase {
                 case .night:
@@ -25,6 +36,11 @@ struct GameView: View {
                             })
                 case .discussion:
                     ResultView(you: you, round: phase.round, deadline: client.phaseDeadline, result: client.result)
+                case .vote:
+                    VoteView(you: you, seats: seats, deadline: client.phaseDeadline,
+                             lockedIn: client.votedRound == phase.round, votedTargetID: client.votedTargetID) { targetID in
+                        client.vote(for: targetID)
+                    }
                 default:
                     WatchScreenView(you: you, phase: phase.phase, deadline: client.phaseDeadline)
                 }
