@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage';
 import logo from './assets/logo.svg';
 import './App.css';
 import RegisterForm from './components/RegisterForm';
+import ProfilePage from './pages/ProfilePage';
 
 interface User {
   id: string;
@@ -13,7 +14,11 @@ interface User {
 }
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app'>('landing');
+  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app' | 'profile'>('landing');
+
+  const [accessToken, setAccessToken] = useState<string>(
+    () => localStorage.getItem('teraphobia_access_token') || ''
+  );
 
   // Form fields
   const [name, setName] = useState('');
@@ -114,13 +119,13 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
+      if (data.accessToken) {
+        setAccessToken(data.accessToken);
+        localStorage.setItem('teraphobia_access_token', data.accessToken);
+      }
       setView('app');
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setErrorMsg(err.message);
-      } else {
-        setErrorMsg('Invalid username or password.');
-      }
+      setErrorMsg(err instanceof Error ? err.message : 'Network error. Could not reach server.');
     } finally {
       setLoading(false);
     }
@@ -128,7 +133,8 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    resetForm();
+    setAccessToken('');
+    localStorage.removeItem('teraphobia_access_token');
     setView('landing');
   };
 
@@ -230,9 +236,14 @@ export default function App() {
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc' }}>Welcome, {currentUser.displayName}!</h2>
               <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{currentUser.email}</p>
             </div>
-            <button onClick={handleLogout} className="btn-secondary">
-              Sign Out
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button onClick={() => setView('profile')} className="btn-secondary">
+                Profile &amp; Stats
+              </button>
+              <button onClick={handleLogout} className="btn-secondary">
+                Sign Out
+              </button>
+            </div>
           </div>
 
           <div className="controls-grid">
@@ -290,6 +301,21 @@ export default function App() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* PROFILE & STATS VIEW */}
+      {view === 'profile' && currentUser && (
+        <ProfilePage
+          accessToken={accessToken}
+          onBack={() => setView('app')}
+          onProfileUpdated={(newName) =>
+            setCurrentUser((prev) => (prev ? { ...prev, displayName: newName } : prev))
+          }
+          onTokenRotated={(newToken) => {
+            setAccessToken(newToken);
+            localStorage.setItem('teraphobia_access_token', newToken);
+          }}
+        />
       )}
     </div>
   );
