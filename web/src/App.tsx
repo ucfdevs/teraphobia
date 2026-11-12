@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage';
 import logo from './assets/logo.svg';
 import './App.css';
 import RegisterForm from './components/RegisterForm';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 interface User {
   id: string;
@@ -13,7 +14,10 @@ interface User {
 }
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app'>('landing');
+  // The emailed verification link opens /verify?token=..., so start on that view.
+  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app' | 'verify'>(() =>
+    window.location.pathname === '/verify' ? 'verify' : 'landing'
+  );
 
   // Form fields
   const [name, setName] = useState('');
@@ -27,6 +31,10 @@ export default function App() {
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Resend verification from the dashboard
+  const [resendMsg, setResendMsg] = useState('');
+  const [resending, setResending] = useState(false);
 
   // Table filter state
   const [roomFilter, setRoomFilter] = useState('All');
@@ -77,7 +85,7 @@ export default function App() {
         throw new Error(data.error || 'Registration failed');
       }
 
-      setSuccessMsg('Account created successfully! Please log in.');
+      setSuccessMsg('Account created! Check your email for a link to verify it, then sign in.');
       setView('login');
       setPassword('');
     } catch (err: unknown) {
@@ -128,8 +136,44 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setResendMsg('');
     resetForm();
     setView('landing');
+  };
+
+  const goHome = () => {
+    window.history.replaceState(null, '', '/');
+    setView('landing');
+  };
+
+  const handleVerifyDone = () => {
+    window.history.replaceState(null, '', '/');
+    if (currentUser) {
+      setCurrentUser({ ...currentUser, emailVerified: true });
+      setView('app');
+    } else {
+      resetForm();
+      setView('login');
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!currentUser) return;
+    setResendMsg('');
+    setResending(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentUser.email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setResendMsg(data.message || data.error || 'Could not send a new link.');
+    } catch {
+      setResendMsg('Could not send a new link.');
+    } finally {
+      setResending(false);
+    }
   };
 
   const rolesData = [
@@ -156,7 +200,7 @@ export default function App() {
       <header className="brand-header">
         <button
           type="button"
-          onClick={() => setView('landing')}
+          onClick={goHome}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
           aria-label="Return to home page"
         >
@@ -199,6 +243,9 @@ export default function App() {
 
       }
 
+      {/* VERIFY EMAIL VIEW */}
+      {view === 'verify' && <VerifyEmailPage email={currentUser?.email} onDone={handleVerifyDone} />}
+
       {/* REGISTER VIEW */}
       {view === 'register' && (
         <div className="auth-card">
@@ -234,6 +281,16 @@ export default function App() {
               Sign Out
             </button>
           </div>
+
+          {!currentUser.emailVerified && (
+            <div className="alert-error" role="alert">
+              Verify your email to host games. Check your inbox for the link.{' '}
+              <button type="button" onClick={handleResendVerification} disabled={resending} className="btn-link">
+                {resending ? 'Sending...' : 'Resend link'}
+              </button>
+              {resendMsg && <div role="status">{resendMsg}</div>}
+            </div>
+          )}
 
           <div className="controls-grid">
             <div>
