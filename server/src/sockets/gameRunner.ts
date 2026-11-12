@@ -1,5 +1,7 @@
+import { finishGame } from '../games/results.js'
 import { phaseDurationMs } from '../game/phases.js'
 import type { Outbound } from '../game/engine.js'
+import { deleteRoom } from '../rooms/store.js'
 import type { Room } from '../rooms/store.js'
 import type { Clock } from './clock.js'
 import type { ServerEvent } from './schemas.js'
@@ -63,11 +65,55 @@ export class GameRunner {
 
   private endPhase() {
     this.timer = undefined
+    try {
+      this.run(() => this.game.endPhase())
+      if (!this.game.over) this.startPhase()
+    } catch (err) {
+      // This runs from a timer, so a throw would crash the server and every other live game with it.
+      console.error(`Game in room ${this.room.code} could not end its phase`, err)
+    }
+  }
+
+  // Runs an engine change and sends its events, then shows deaths on the shared screen and wraps up a
+  // finished game.
+  run(change: () => Outbound[]) {
     const before = this.lifeStatuses()
-    this.send(this.game.endPhase())
-    // Deaths and banishments show on the shared screen.
+    const events = change()
+    const gameOver = events.filter((e) => e.event === 'game:over')
+    this.send(events.filter((e) => e.event !== 'game:over'))
     if (this.lifeStatuses() !== before) this.ctx.broadcastState(this.room)
-    this.startPhase()
+    if (this.game.over && gameOver.length > 0) this.finish()
+  }
+
+  // Game over: tell the room, save the result in the background, and free the code.
+  private finish() {
+    this.stop()
+    const { room, game } = this
+    const endedAt = new Date(this.ctx.clock.now())
+    void finishGame(
+      {
+        roomCode: room.code,
+        hostUserId: room.hostUserId,
+        preset: room.preset,
+        startedAt: room.startedAt ?? endedAt,
+        endedAt,
+        seats: game.players.map((player) => {
+          const seat = room.seats.find((s) => s.seatId === player.seatId)!
+          return {
+            seatId: player.seatId,
+            displayName: seat.displayName,
+            costume: { ...player.costume },
+            userId: seat.userId,
+            diedRound: player.diedRound,
+          }
+        }),
+        result: game.over!,
+      },
+      (payload) => this.send([{ to: 'room', event: 'game:over', payload }]),
+    )
+    // room:state now shows `ended`.
+    this.ctx.broadcastState(room)
+    deleteRoom(room.code)
   }
 
   private lifeStatuses() {

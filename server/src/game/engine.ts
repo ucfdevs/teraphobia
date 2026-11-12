@@ -16,6 +16,20 @@ export interface Player {
   costume: Costume
   role: Role
   lifeStatus: LifeStatus
+  // The round the player was killed, banished, or removed in.
+  diedRound?: number
+}
+
+export type Winner = 'villagers' | 'monster'
+export type EndReason = 'banished' | 'outnumbered' | 'forfeit'
+
+// The `game:over` payload.
+export interface GameOver {
+  winner: Winner
+  endReason: EndReason
+  rounds: number
+  monster: { seatId: string; monsterType: MonsterType }
+  hunches: Hunch[]
 }
 
 // Something the socket layer should send: to the whole room, or privately to one seat.
@@ -90,6 +104,10 @@ export class GameEngine {
   powerUsed = false
   // Today's Vampire block or Witch fake, resolved at Day end.
   private powerTarget: string | undefined
+  // This Vote's ballots: a seat id, or null for Skip. The last submit counts.
+  private votes = new Map<string, string | null>()
+  // Set once someone wins; the game takes no more events.
+  over: GameOver | undefined
 
   constructor(seatIds: string[], readonly rng: Rng) {
     const { costumes, monsterIndex, monsterType } = deal(seatIds.length, rng)
@@ -105,13 +123,45 @@ export class GameEngine {
 
   // Resolves the phase that just ran out and moves to the next one. Phases only end here, on the timer.
   endPhase(): Outbound[] {
+    if (this.over) return []
     const events: Outbound[] = []
     const ending = this.phase
     if (ending === 'night') events.push(...this.resolveNight())
     if (ending === 'day') events.push(...this.resolveDay())
+    if (ending === 'vote') events.push(...this.resolveVote())
+    // Win checks run after each Morning reveal and after each vote.
+    if (ending === 'morning' || ending === 'vote') events.push(...this.checkWin())
+    if (this.over) return events
     this.phase = nextPhase(ending)
     if (ending === 'vote') this.round += 1
     return events
+  }
+
+  // Ends the game with this result and returns the game:over event.
+  end(winner: Winner, endReason: EndReason): Outbound[] {
+    this.over = {
+      winner,
+      endReason,
+      rounds: this.round,
+      monster: { seatId: this.monsterSeatId, monsterType: this.monsterType },
+      hunches: this.hunches.map((h) => ({ ...h })),
+    }
+    return [{ to: 'room', event: 'game:over', payload: this.over }]
+  }
+
+  checkWin(): Outbound[] {
+    if (this.over) return []
+    if (!this.alive(this.monsterSeatId)) return this.end('villagers', 'banished')
+    // Monsters equal Villagers: one Villager left alive.
+    if (this.livingPlayers().filter((p) => p.role === 'villager').length <= 1) return this.end('monster', 'outnumbered')
+    return []
+  }
+
+  // Marks a player out (killed, banished, or removed) in the current round.
+  private takeOut(seatId: string, status: 'dead' | 'banished') {
+    const player = this.player(seatId)!
+    player.lifeStatus = status
+    player.diedRound = this.round
   }
 
   alive(seatId: string) {
@@ -124,6 +174,7 @@ export class GameEngine {
 
   // Checks the sender can act in this phase: a living player, during it.
   private actor(seatId: string, phase: Phase): Player | Rejection {
+    if (this.over) return reject('wrong_phase', 'The game is over')
     if (this.phase !== phase) return reject('wrong_phase', `That can only be done at ${phase}`)
     const player = this.player(seatId)
     if (!player || player.lifeStatus !== 'alive') return reject('not_allowed', 'Only living players can do that')
@@ -179,9 +230,32 @@ export class GameEngine {
     return null
   }
 
+  submitVote(seatId: string, targetId: string | null): Rejection | null {
+    const player = this.actor(seatId, 'vote')
+    if ('code' in player) return player
+    if (targetId !== null && !this.alive(targetId)) return reject('invalid_target', 'Vote for a living player or Skip')
+    this.votes.set(seatId, targetId)
+    return null
+  }
+
+  // Banishes a player only with more votes than any other option, Skip included. A tie banishes nobody.
+  private resolveVote(): Outbound[] {
+    const votes = this.livingPlayers().map(({ seatId }) => ({ voterId: seatId, targetId: this.votes.get(seatId) ?? null }))
+    const tally = new Map<string | null, number>()
+    for (const { targetId } of votes) tally.set(targetId, (tally.get(targetId) ?? 0) + 1)
+    const ranked = [...tally].sort((a, b) => b[1] - a[1])
+    const [top, runnerUp] = ranked
+    const banishedId = top && top[0] !== null && (!runnerUp || top[1] > runnerUp[1]) ? top[0] : null
+
+    if (banishedId) this.takeOut(banishedId, 'banished')
+    this.votes.clear()
+    return [{ to: 'room', event: 'vote:reveal', payload: { round: this.round, votes, banishedId } }]
+  }
+
   // Vampire and Witch powers, during Day. The Werewolf's double kill goes through night:submit.
   usePower(seatId: string, targetId: string): Rejection | null {
     const player = this.player(seatId)
+    if (this.over) return reject('wrong_phase', 'The game is over')
     if (!player || player.role !== 'monster' || player.lifeStatus !== 'alive') return reject('not_allowed', 'Only the Monster has a power')
     if (this.monsterType === 'werewolf') return reject('not_allowed', 'The Werewolf kills twice with night:submit')
     if (this.phase !== 'day') return reject('wrong_phase', 'The power can only be used during Day')
@@ -194,7 +268,7 @@ export class GameEngine {
   private resolveNight(): Outbound[] {
     if (this.victimIds.length > 1) this.powerUsed = true
     const deadIds = this.victimIds.filter((id) => this.alive(id) && !this.protectedTonight.has(id))
-    for (const id of deadIds) this.player(id)!.lifeStatus = 'dead'
+    for (const id of deadIds) this.takeOut(id, 'dead')
     for (const [seatId, suspectId] of this.suspects) this.hunches.push({ seatId, round: this.round, suspectId })
 
     this.lastNightDeaths = deadIds

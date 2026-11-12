@@ -42,7 +42,7 @@ function channel(code: string) {
 export function roomState(room: Room) {
   return {
     code: room.code,
-    status: room.startedAt ? 'playing' : 'lobby',
+    status: room.game?.over ? 'ended' : room.startedAt ? 'playing' : 'lobby',
     preset: room.preset,
     hostConnected: room.hostConnected,
     seats: room.seats.map((seat) => {
