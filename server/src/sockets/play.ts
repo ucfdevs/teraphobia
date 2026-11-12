@@ -1,5 +1,5 @@
 import type { Socket } from 'socket.io'
-import type { NightSubmit, Rejection } from '../game/engine.js'
+import type { DaySubmit, NightSubmit, Rejection } from '../game/engine.js'
 import { getRoom } from '../rooms/store.js'
 import type { Room } from '../rooms/store.js'
 import { onEvent, sendError } from './events.js'
@@ -27,4 +27,5 @@ function handle<T>(socket: Socket, event: ClientEvent, act: (payload: T, seatId:
 
 export function registerPlay(socket: Socket) {
   handle<NightSubmit>(socket, 'night:submit', (payload, seatId, room) => room.game!.submitNight(seatId, payload))
+  handle<DaySubmit>(socket, 'day:submit', (payload, seatId, room) => room.game!.submitDay(seatId, payload))
 }
