@@ -10,7 +10,11 @@ import type { Rng } from '../game/random.js'
 import { verifyAccessToken } from '../lib/session.js'
 import { addSeat, findRoomByHost, getRoom, MAX_PLAYERS, MIN_PLAYERS, nameTaken, removeSeat } from '../rooms/store.js'
 import type { Room } from '../rooms/store.js'
+import { realClock } from './clock.js'
+import type { Clock } from './clock.js'
 import { emitEvent, onEvent, rejectUnknownEvents, sendError } from './events.js'
+import { GameRunner } from './gameRunner.js'
+import type { RunnerContext } from './gameRunner.js'
 
 // What the server remembers about each connection.
 interface SocketData {
@@ -57,6 +61,8 @@ export function roomState(room: Room) {
 export interface SocketServerOptions {
   // Seeded in tests (and the balance script) so deals repeat.
   random?: Rng
+  // A manual clock in tests.
+  clock?: Clock
 }
 
 export function createSocketServer(httpServer: HttpServer, options: SocketServerOptions = {}) {
@@ -69,6 +75,16 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
 
   function broadcast(room: Room) {
     emitEvent(io.to(channel(room.code)), 'room:state', roomState(room))
+  }
+
+  // How game runners reach the room and each seat's phone.
+  const runnerContext: RunnerContext = {
+    clock: options.clock ?? realClock,
+    toRoom: (room, event, payload) => emitEvent(io.to(channel(room.code)), event, payload),
+    toSeat: (_room, seatId, event, payload) => {
+      const phone = seatSockets.get(seatId)
+      if (phone) emitEvent(phone, event, payload)
+    },
   }
 
   // A bad token is refused before connecting, so the host screen sees connect_error instead of joining as a phone.
@@ -134,6 +150,8 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
         const phone = seatSockets.get(seat.seatId)
         if (phone) emitEvent(phone, 'you:role', room.game.youRole(seat.seatId))
       }
+      room.runner = new GameRunner(runnerContext, room)
+      room.runner.start()
     })
 
     socket.on('disconnect', () => {

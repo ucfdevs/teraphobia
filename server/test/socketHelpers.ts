@@ -114,3 +114,80 @@ export async function startSocketServer(options: SocketServerOptions = {}) {
 }
 
 export type SocketHarness = Awaited<ReturnType<typeof startSocketServer>>
+
+// A clock tests move by hand. Timers fire in time order, including ones scheduled while advancing.
+export class ManualClock {
+  time = 1_800_000_000_000
+  private nextId = 1
+  private timers: { id: number; at: number; fn: () => void }[] = []
+
+  now = () => this.time
+
+  setTimeout = (fn: () => void, ms: number) => {
+    const id = this.nextId++
+    this.timers.push({ id, at: this.time + ms, fn })
+    return id
+  }
+
+  clearTimeout = (id: unknown) => {
+    this.timers = this.timers.filter((t) => t.id !== id)
+  }
+
+  advance(ms: number) {
+    const target = this.time + ms
+    for (;;) {
+      const due = this.timers.filter((t) => t.at <= target).sort((a, b) => a.at - b.at || a.id - b.id)[0]
+      if (!due) break
+      this.timers = this.timers.filter((t) => t !== due)
+      this.time = due.at
+      due.fn()
+    }
+    this.time = target
+  }
+
+  pending() {
+    return this.timers.length
+  }
+}
+
+export interface StartedGame {
+  host: TestClient
+  phones: TestClient[]
+  // you:role per phone, same order as phones.
+  roles: { seatId: string; role: 'villager' | 'monster'; monsterType?: string; costume: Record<string, string> }[]
+  code: string
+  monster: TestClient
+  villagers: TestClient[]
+  seatOf: (phone: TestClient) => string
+}
+
+// Creates a room, seats `players` phones, starts the game, and waits for night 1.
+export async function startGame(
+  harness: SocketHarness,
+  createHostRoom: () => { code: string; hostToken: string },
+  players: number,
+): Promise<StartedGame> {
+  const { code, hostToken } = createHostRoom()
+  const host = await harness.connect({ token: hostToken })
+  await host.next('room:state')
+  const phones: TestClient[] = []
+  for (let i = 1; i <= players; i += 1) {
+    const phone = await harness.connect()
+    phone.emit('room:join', { code, displayName: `Player ${i}` })
+    await host.next('room:state', (s) => s.seats.length === i)
+    phones.push(phone)
+  }
+  host.emit('room:start', {})
+  const roles = await Promise.all(phones.map((p) => p.next('you:role')))
+  await Promise.all([host, ...phones].map((c) => c.next('phase:start', (p) => p.phase === 'night' && p.round === 1)))
+  const monster = phones[roles.findIndex((r) => r.role === 'monster')]
+  return {
+    host,
+    phones,
+    roles,
+    code,
+    monster,
+    villagers: phones.filter((p) => p !== monster),
+    seatOf: (phone) => roles[phones.indexOf(phone)].seatId,
+  }
+}

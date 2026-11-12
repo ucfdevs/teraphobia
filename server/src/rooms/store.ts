@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import type { GameEngine } from '../game/engine.js'
 import type { Preset } from '../models/game.js'
+import type { GameRunner } from '../sockets/gameRunner.js'
 
 // Live rooms live in memory only (PRD). The socket handlers in src/sockets use this module.
 
@@ -26,6 +27,7 @@ export interface Room {
   seats: Seat[]
   // Set at Start.
   game?: GameEngine
+  runner?: GameRunner
 }
 
 export type RoomStatus = 'open' | 'started' | 'full'
@@ -45,7 +47,7 @@ export function normalizeCode(code: string) {
 export function createRoom(hostUserId: string, preset: Preset): Room {
   // One live room per host: a new room replaces the old one, so rooms can't pile up.
   for (const room of rooms.values()) {
-    if (room.hostUserId === hostUserId) rooms.delete(room.code)
+    if (room.hostUserId === hostUserId) deleteRoom(room.code)
   }
   // 26^4 = 456,976 codes, so collisions are rare; the cap only guards against a full store.
   for (let attempt = 0; attempt < 1000; attempt += 1) {
@@ -94,9 +96,11 @@ export function roomStatus(room: Room): RoomStatus {
 
 // Frees the code (game end or host leaves).
 export function deleteRoom(code: string) {
+  getRoom(code)?.runner?.stop()
   return rooms.delete(normalizeCode(code))
 }
 
 export function clearRooms() {
+  for (const room of rooms.values()) room.runner?.stop()
   rooms.clear()
 }
