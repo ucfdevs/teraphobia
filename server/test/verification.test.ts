@@ -74,6 +74,16 @@ describe('POST /api/auth/verify', () => {
     expect((await request(app).post('/api/auth/verify').send({})).status).toBe(400)
   })
 
+  it('makes older links stop working once one verifies', async () => {
+    const user = await createUser()
+    const older = await createToken(user._id, 'verify', 60_000)
+    const newer = await createToken(user._id, 'verify', 60_000)
+
+    expect((await request(app).post('/api/auth/verify').send({ token: newer })).status).toBe(200)
+    expect((await request(app).post('/api/auth/verify').send({ token: older })).status).toBe(400)
+    expect(await AuthToken.countDocuments({ userId: user._id, type: 'verify', usedAt: null })).toBe(0)
+  })
+
   it('rejects a token of another type with 400', async () => {
     const user = await createUser()
     const token = await createToken(user._id, 'reset', 60_000)

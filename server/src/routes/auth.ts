@@ -123,6 +123,8 @@ async function verify(req: Request, res: Response) {
     return
   }
   await User.updateOne({ _id: token.userId }, { emailVerified: true })
+  // Any other verification links sent before this one stop working too.
+  await AuthToken.updateMany({ userId: token.userId, type: 'verify', usedAt: null }, { usedAt: new Date() })
   res.json({ message: 'Email verified' })
 }
 
