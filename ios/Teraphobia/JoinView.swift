@@ -65,7 +65,7 @@ struct JoinView: View {
             }
             .navigationTitle("Teraphobia")
             .navigationDestination(isPresented: $client.joined) {
-                WaitingRoomView(client: client)
+                GameView(client: client)
             }
         }
         .tint(.orange)

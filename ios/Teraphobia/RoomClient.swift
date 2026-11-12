@@ -15,6 +15,15 @@ final class RoomClient {
     var nameError: String?
     var roomError: String?
 
+    // The game, from the server's private and phase events.
+    var you: YouRole?
+    var phase: PhaseStart?
+    var phaseDeadline = Date()
+    var result: YouResult?
+    var powerUsed = false
+    var nightVictims = 0
+    var gameError: String?
+
     private var manager: SocketManager?
 
     func join(code: String, displayName: String) async {
@@ -39,6 +48,12 @@ final class RoomClient {
         joined = false
         room = nil
         seatID = nil
+        you = nil
+        phase = nil
+        result = nil
+        powerUsed = false
+        nightVictims = 0
+        gameError = nil
     }
 
     func emit(_ event: String, _ value: some Encodable) {
@@ -83,8 +98,31 @@ final class RoomClient {
         socket.on("room:state") { [weak self] data, _ in
             self?.room = Self.decode(RoomState.self, data)
         }
+        socket.on("you:role") { [weak self] data, _ in
+            self?.you = Self.decode(YouRole.self, data)
+        }
+        socket.on("phase:start") { [weak self] data, _ in
+            guard let self, let next = Self.decode(PhaseStart.self, data) else { return }
+            // The Werewolf's double kill is used up once a night with two victims ends.
+            if next.phase == .morning {
+                if nightVictims == 2 { powerUsed = true }
+                nightVictims = 0
+            }
+            phase = next
+            // The phone's clock can differ from the server's, so only the time left is used.
+            phaseDeadline = Date().addingTimeInterval(Double(next.endsAt - next.serverNow) / 1000)
+            gameError = nil
+        }
+        socket.on("you:result") { [weak self] data, _ in
+            self?.result = Self.decode(YouResult.self, data)
+        }
         socket.on("error") { [weak self] data, _ in
-            guard let self, !joined else { return }
+            guard let self else { return }
+            // Once in the room, a refused pick or action is shown on the game screen.
+            if joined {
+                gameError = Self.decode(ServerError.self, data)?.message
+                return
+            }
             // Name problems go under the name field; anything else under the Join button.
             let serverError = Self.decode(ServerError.self, data)
             switch serverError?.code {
