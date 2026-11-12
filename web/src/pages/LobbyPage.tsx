@@ -9,7 +9,7 @@ import LobbyUser from '../components/LobbyUser';
 import "./lobby.css"
 
 interface User {
-    id: number;
+    id: string;
     profileSrc: string;
     username: string;
 }
@@ -18,6 +18,7 @@ interface User {
 
 export default function LobbyPage() {
     const [userList, setUsers] = useState<User[]>([])
+    const [buttonStatus, setButtonStatus] = useState<string>('disabled');
     
     /**
      * Takes a string and converts it into the code to be displayed on the webpage
@@ -46,14 +47,23 @@ export default function LobbyPage() {
         return SanitizeLobbyCode(code);
     }
 
-    function AddMockData() {
+    // !!! -- Needs to pull from actual user data
+    // !!! -- Currently only creates mock data
+    async function AddData() {
         const userid = crypto.randomUUID();
         const newUser: User = {
-            id: Number(userid),
-            username: 'user' + userid,
+            id: userid,
+            username: 'user ' + userid,
             profileSrc: 'profile' + userid,
         };
         setUsers((prev) => [...prev, newUser])
+
+        if (userList.length > 2) {
+            setButtonStatus('enabled')
+        }
+        else {
+            setButtonStatus('disabled');
+        }
     }
 
     
@@ -89,8 +99,8 @@ export default function LobbyPage() {
                 }
             </ul>
         </div>
-        <button className='start-game-button'>Start Game</button>
-        <button onClick={AddMockData} className='dev-mock-data'>Add Mock Data</button>
+        <button className={'button-' + buttonStatus + ' start-game-button'}>Start Game</button>
+        <button onClick={AddData} className='dev-mock-data'>Add Mock Data</button>
         </>
     )
 }

@@ -34,3 +34,7 @@
 ul {
     list-style-type: none;
 }
+
+.button-disabled {
+    opacity: 50%;
+}
