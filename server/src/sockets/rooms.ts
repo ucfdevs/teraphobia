@@ -4,6 +4,9 @@
 import type { Server as HttpServer } from 'node:http'
 import { Server } from 'socket.io'
 import type { Socket } from 'socket.io'
+import { GameEngine } from '../game/engine.js'
+import { secureRandom } from '../game/random.js'
+import type { Rng } from '../game/random.js'
 import { verifyAccessToken } from '../lib/session.js'
 import { addSeat, findRoomByHost, getRoom, MAX_PLAYERS, MIN_PLAYERS, nameTaken, removeSeat } from '../rooms/store.js'
 import type { Room } from '../rooms/store.js'
@@ -37,18 +40,27 @@ export function roomState(room: Room) {
     status: room.startedAt ? 'playing' : 'lobby',
     preset: room.preset,
     hostConnected: room.hostConnected,
-    seats: room.seats.map((seat) => ({
-      seatId: seat.seatId,
-      displayName: seat.displayName,
-      connected: seat.connected,
-      // Death and costumes come with the game engine (#23, #24).
-      lifeStatus: 'alive',
-      costume: null,
-    })),
+    seats: room.seats.map((seat) => {
+      const player = room.game?.player(seat.seatId)
+      return {
+        seatId: seat.seatId,
+        displayName: seat.displayName,
+        connected: seat.connected,
+        lifeStatus: player?.lifeStatus ?? 'alive',
+        // Costumes are public once dealt at Start.
+        costume: player ? { ...player.costume } : null,
+      }
+    }),
   }
 }
 
-export function createSocketServer(httpServer: HttpServer) {
+export interface SocketServerOptions {
+  // Seeded in tests (and the balance script) so deals repeat.
+  random?: Rng
+}
+
+export function createSocketServer(httpServer: HttpServer, options: SocketServerOptions = {}) {
+  const random = options.random ?? secureRandom
   const io = new Server(httpServer, { path: '/socket.io', serveClient: false })
   // The socket in each seat and the host screen of each room, so a kick can disconnect the right phone
   // and an old host tab closing doesn't mark a newer one as gone.
@@ -113,9 +125,15 @@ export function createSocketServer(httpServer: HttpServer) {
       if (room.seats.length < MIN_PLAYERS) {
         return sendError(socket, 'not_enough_players', `At least ${MIN_PLAYERS} players are needed to start`, 'room:start')
       }
-      // Closes the code to new phones; dealing and phases come with #23 and #24.
+      // Closes the code to new phones, deals costumes, and picks the Monster.
       room.startedAt = new Date()
+      room.game = new GameEngine(room.seats.map((seat) => seat.seatId), random)
       broadcast(room)
+      // Each phone learns only its own role; only the Monster's includes monsterType.
+      for (const seat of room.seats) {
+        const phone = seatSockets.get(seat.seatId)
+        if (phone) emitEvent(phone, 'you:role', room.game.youRole(seat.seatId))
+      }
     })
 
     socket.on('disconnect', () => {
