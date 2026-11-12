@@ -1,0 +1,59 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Teraphobia shared design tokens — dark moonlit palette, single orange accent, WCAG AA verified",
+    "colors": {
+        "background": "#090d1a",
+        "backgroundElevated": "#11162b",
+        "surface": "#141b2e",
+        "surfaceHover": "#1c2540",
+        "border": "#2a3554",
+        "text": "#f8fafc",
+        "mutedText": "#94a3b8",
+        "accent": "#f97316",
+        "accentHover": "#fb923c",
+        "accentText": "#090d1a",
+        "danger": "#dc2626",
+        "dangerHover": "#b91c1c",
+        "dangerLight": "#fca5a5",
+        "dangerText": "#ffffff"
+    },
+    "typography": {
+        "fontDisplay": "'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, sans-serif",
+        "fontBody": "'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        "fontMono": "'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace",
+        "iosFontDisplay": "BricolageGrotesque-Bold",
+        "iosFontBody": "IBMPlexSans-Regular",
+        "iosFontMono": "IBMPlexMono-Regular",
+        "scale": {
+            "xs": 12,
+            "sm": 14,
+            "base": 16,
+            "lg": 18,
+            "xl": 20,
+            "2xl": 24,
+            "3xl": 32,
+            "4xl": 44
+        },
+        "lineHeight": {
+            "tight": 1.15,
+            "normal": 1.5,
+            "relaxed": 1.65
+        }
+    },
+    "spacing": {
+        "xs": 4,
+        "sm": 8,
+        "md": 12,
+        "lg": 16,
+        "xl": 24,
+        "2xl": 32,
+        "3xl": 48
+    },
+    "radii": {
+        "sm": 6,
+        "md": 10,
+        "lg": 14,
+        "xl": 20,
+        "full": 9999
+    }
+}
