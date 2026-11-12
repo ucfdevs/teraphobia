@@ -157,6 +157,14 @@ export class GameEngine {
     return []
   }
 
+  // Removes players gone too long, as if killed. A missing Monster forfeits.
+  removePlayers(seatIds: string[]): Outbound[] {
+    if (this.over) return []
+    for (const id of seatIds) if (this.alive(id)) this.takeOut(id, 'dead')
+    if (seatIds.includes(this.monsterSeatId)) return this.end('villagers', 'forfeit')
+    return this.checkWin()
+  }
+
   // Marks a player out (killed, banished, or removed) in the current round.
   private takeOut(seatId: string, status: 'dead' | 'banished') {
     const player = this.player(seatId)!

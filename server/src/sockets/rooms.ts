@@ -9,18 +9,21 @@ import { secureRandom } from '../game/random.js'
 import type { Rng } from '../game/random.js'
 import { verifyAccessToken } from '../lib/session.js'
 import { addSeat, findRoomByHost, getRoom, MAX_PLAYERS, MIN_PLAYERS, nameTaken, removeSeat } from '../rooms/store.js'
-import type { Room } from '../rooms/store.js'
+import type { Room, Seat } from '../rooms/store.js'
 import { realClock } from './clock.js'
 import type { Clock } from './clock.js'
 import { emitEvent, onEvent, rejectUnknownEvents, sendError } from './events.js'
 import { GameRunner } from './gameRunner.js'
 import type { RunnerContext } from './gameRunner.js'
 import { registerPlay } from './play.js'
+import { signRejoinToken, verifyRejoinToken } from './rejoin.js'
 
 // What the server remembers about each connection.
 interface SocketData {
-  // Set by the handshake when an access token is sent: only the host screen sends one.
+  // Set by the handshake when an access token is sent: by the host screen, or by a signed-in phone that
+  // also sends `auth.player: true`.
   userId?: string
+  signedInPlayer?: boolean
   role?: 'host' | 'player'
   code?: string
   seatId?: string
@@ -29,6 +32,7 @@ interface SocketData {
 interface RoomJoin {
   code: string
   displayName: string
+  rejoinToken?: string
 }
 
 interface RoomKick {
@@ -56,6 +60,20 @@ export function roomState(room: Room) {
         costume: player ? { ...player.costume } : null,
       }
     }),
+  }
+}
+
+// Everything this player already knows, for a phone that just got its seat back.
+function youRejoined(room: Room, seatId: string) {
+  const game = room.game
+  const you = game?.youRole(seatId) ?? null
+  return {
+    room: roomState(room),
+    phase: room.runner && !game?.over ? room.runner.phaseStart() : null,
+    you,
+    results: game?.results.get(seatId) ?? [],
+    lastCandleTargetId: game?.lastCandleTarget.get(seatId) ?? null,
+    ...(you?.role === 'monster' ? { powerUsed: game!.powerUsed } : {}),
   }
 }
 
@@ -96,6 +114,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     const userId = typeof token === 'string' ? verifyAccessToken(token) : null
     if (!userId) return next(new Error('Invalid or expired token'))
     ;(socket.data as SocketData).userId = userId
+    ;(socket.data as SocketData).signedInPlayer = socket.handshake.auth?.player === true
     next()
   })
 
@@ -104,21 +123,31 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     rejectUnknownEvents(socket)
     registerPlay(socket)
 
-    if (data.userId) connectHost(socket, data)
+    if (data.userId && !data.signedInPlayer) connectHost(socket, data)
 
-    onEvent<RoomJoin>(socket, 'room:join', ({ code, displayName }) => {
+    onEvent<RoomJoin>(socket, 'room:join', ({ code, displayName, rejoinToken }) => {
       if (data.role) return sendError(socket, 'not_allowed', 'Already in a room', 'room:join')
       const room = getRoom(code)
       if (!room) return sendError(socket, 'room_not_found', 'No room with that code', 'room:join')
+
+      // Back to an existing seat, even after Start: guests by rejoin token, signed-in players by account.
+      if (rejoinToken !== undefined) {
+        const claim = verifyRejoinToken(rejoinToken)
+        const seat = claim?.code === room.code ? room.seats.find((s) => s.seatId === claim.seatId) : undefined
+        if (!seat) return sendError(socket, 'invalid_rejoin_token', 'That seat is no longer yours', 'room:join')
+        return takeSeat(socket, data, room, seat, true)
+      }
+      const accountSeat = data.signedInPlayer ? room.seats.find((s) => s.userId === data.userId) : undefined
+      if (accountSeat) return takeSeat(socket, data, room, accountSeat, true)
+
       if (room.startedAt) return sendError(socket, 'game_started', 'Game already started', 'room:join')
       if (room.seats.length >= MAX_PLAYERS) return sendError(socket, 'room_full', 'This room is full', 'room:join')
       if (nameTaken(room, displayName)) return sendError(socket, 'name_taken', 'That name is taken in this room', 'room:join')
 
       const seat = addSeat(room, displayName)
-      Object.assign(data, { role: 'player', code: room.code, seatId: seat.seatId })
-      seatSockets.set(seat.seatId, socket)
-      socket.join(channel(room.code))
-      broadcast(room)
+      // Signed-in players' results count toward their stats (#37).
+      if (data.signedInPlayer) seat.userId = data.userId
+      takeSeat(socket, data, room, seat, false)
     })
 
     onEvent<RoomKick>(socket, 'room:kick', ({ seatId }) => {
@@ -165,13 +194,18 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
         if (hostSockets.get(room.code) !== socket) return
         hostSockets.delete(room.code)
         room.hostConnected = false
+        // The game keeps running on the server, but its timers wait for the host screen.
+        room.runner?.pause()
       } else if (data.role === 'player' && data.seatId) {
         seatSockets.delete(data.seatId)
         // Before Start a phone that leaves frees its seat. After Start the seat stays for rejoining (#29).
         if (!room.startedAt) removeSeat(room, data.seatId)
         else {
           const seat = room.seats.find((s) => s.seatId === data.seatId)
-          if (seat) seat.connected = false
+          if (seat) {
+            seat.connected = false
+            seat.awayRound = room.game?.round
+          }
         }
       }
       broadcast(room)
@@ -193,6 +227,27 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     Object.assign(data, { role: 'host', code: room.code })
     room.hostConnected = true
     socket.join(channel(room.code))
+    broadcast(room)
+    // Timers paused while the host screen was away pick up where they stopped.
+    room.runner?.resume()
+  }
+
+  // Puts this socket in the seat, taking it from an older connection if there is one, and gives the phone
+  // its rejoin token. A rejoining phone also gets everything it already knew.
+  function takeSeat(socket: Socket, data: SocketData, room: Room, seat: Seat, rejoining: boolean) {
+    const previous = seatSockets.get(seat.seatId)
+    seatSockets.set(seat.seatId, socket)
+    if (previous && previous !== socket) {
+      // Cleared first, so its disconnect handler leaves the seat alone.
+      Object.assign(previous.data as SocketData, { role: undefined, code: undefined, seatId: undefined })
+      previous.disconnect(true)
+    }
+    seat.connected = true
+    seat.awayRound = undefined
+    Object.assign(data, { role: 'player', code: room.code, seatId: seat.seatId })
+    socket.join(channel(room.code))
+    emitEvent(socket, 'you:joined', { seatId: seat.seatId, rejoinToken: signRejoinToken(room.code, seat.seatId) })
+    if (rejoining) emitEvent(socket, 'you:rejoined', youRejoined(room, seat.seatId))
     broadcast(room)
   }
 
