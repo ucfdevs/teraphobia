@@ -1,5 +1,12 @@
 # React + TypeScript + Vite
 
+## API documentation
+
+The REST API is described in OpenAPI 3 at [`docs/openapi.yaml`](docs/openapi.yaml): every endpoint in the PRD's REST table, with auth, request bodies, and every success and error response. Socket.io events are defined separately in [`shared/schemas`](shared/schemas).
+
+- SwaggerHub: _link added once the spec is published_
+- `server/test/openapi.test.ts` calls every documented endpoint and fails if a response doesn't match the spec, so update the spec whenever an endpoint changes.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
