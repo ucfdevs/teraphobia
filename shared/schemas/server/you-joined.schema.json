@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "YouJoined",
+  "description": "Server to one, event `you:joined`. Sent when a phone takes a seat. The phone keeps the rejoin token and sends it in `room:join` to get the same seat back after a drop.",
+  "type": "object",
+  "properties": {
+    "seatId": { "$ref": "../common.schema.json#/definitions/SeatId" },
+    "rejoinToken": {
+      "description": "Signed token for this room and seat. Store it on the device; never show it.",
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": ["seatId", "rejoinToken"],
+  "additionalProperties": false
+}

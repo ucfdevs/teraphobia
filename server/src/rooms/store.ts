@@ -15,6 +15,8 @@ export interface Seat {
   displayName: string
   connected: boolean
   userId?: string
+  // The round the player dropped in, while they are away during a game.
+  awayRound?: number
 }
 
 export interface Room {

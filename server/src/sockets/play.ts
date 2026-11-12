@@ -28,5 +28,6 @@ function handle<T>(socket: Socket, event: ClientEvent, act: (payload: T, seatId:
 export function registerPlay(socket: Socket) {
   handle<NightSubmit>(socket, 'night:submit', (payload, seatId, room) => room.game!.submitNight(seatId, payload))
   handle<DaySubmit>(socket, 'day:submit', (payload, seatId, room) => room.game!.submitDay(seatId, payload))
+  handle<{ targetId: string | null }>(socket, 'vote:submit', ({ targetId }, seatId, room) => room.game!.submitVote(seatId, targetId))
   handle<{ targetId: string }>(socket, 'power:use', ({ targetId }, seatId, room) => room.game!.usePower(seatId, targetId))
 }
