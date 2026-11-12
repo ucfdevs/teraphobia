@@ -162,7 +162,7 @@ export default function App() {
         >
           <img src={logo} alt="Teraphobia Logo" className="brand-logo" />
         </button>
-        <p className="brand-subtitle">Halloween Social Deduction System</p>
+        <p className="brand-subtitle">Halloween Social Deduction Game</p>
       </header>
       {/* LANDING VIEW */}
       {view === 'landing' && (
@@ -227,7 +227,7 @@ export default function App() {
         <div className="dashboard-card">
           <div className="dash-header">
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Welcome, {currentUser.displayName}!</h2>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#f8fafc' }}>Welcome, {currentUser.displayName}!</h2>
               <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{currentUser.email}</p>
             </div>
             <button onClick={handleLogout} className="btn-secondary">
