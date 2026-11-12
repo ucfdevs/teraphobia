@@ -15,6 +15,7 @@ import type { Clock } from './clock.js'
 import { emitEvent, onEvent, rejectUnknownEvents, sendError } from './events.js'
 import { GameRunner } from './gameRunner.js'
 import type { RunnerContext } from './gameRunner.js'
+import { registerPlay } from './play.js'
 
 // What the server remembers about each connection.
 interface SocketData {
@@ -85,6 +86,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
       const phone = seatSockets.get(seatId)
       if (phone) emitEvent(phone, event, payload)
     },
+    broadcastState: (room) => broadcast(room),
   }
 
   // A bad token is refused before connecting, so the host screen sees connect_error instead of joining as a phone.
@@ -100,6 +102,7 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
   io.on('connection', (socket) => {
     const data = socket.data as SocketData
     rejectUnknownEvents(socket)
+    registerPlay(socket)
 
     if (data.userId) connectHost(socket, data)
 

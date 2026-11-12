@@ -9,6 +9,8 @@ export interface RunnerContext {
   clock: Clock
   toRoom(room: Room, event: ServerEvent, payload: unknown): void
   toSeat(room: Room, seatId: string, event: ServerEvent, payload: unknown): void
+  // Sends the public room:state, for deaths and status changes.
+  broadcastState(room: Room): void
 }
 
 // Owns the real timer for one room's game: starts each phase, and when its time is up asks the engine to
@@ -61,7 +63,14 @@ export class GameRunner {
 
   private endPhase() {
     this.timer = undefined
+    const before = this.lifeStatuses()
     this.send(this.game.endPhase())
+    // Deaths and banishments show on the shared screen.
+    if (this.lifeStatuses() !== before) this.ctx.broadcastState(this.room)
     this.startPhase()
+  }
+
+  private lifeStatuses() {
+    return this.game.players.map((p) => p.lifeStatus).join()
   }
 }
