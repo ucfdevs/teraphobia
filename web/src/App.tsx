@@ -5,6 +5,8 @@ import logo from './assets/logo.svg';
 import './App.css';
 import RegisterForm from './components/RegisterForm';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import HostScreen from './host/HostScreen';
+import type { Session } from './host/HostScreen';
 
 interface User {
   id: string;
@@ -15,7 +17,7 @@ interface User {
 
 export default function App() {
   // The emailed verification link opens /verify?token=..., so start on that view.
-  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app' | 'verify'>(() =>
+  const [view, setView] = useState<'landing' | 'login' | 'register' | 'app' | 'verify' | 'host'>(() =>
     window.location.pathname === '/verify' ? 'verify' : 'landing'
   );
 
@@ -31,6 +33,8 @@ export default function App() {
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Tokens from sign in, kept in memory only. The host screen needs them for POST /rooms and its socket.
+  const [session, setSession] = useState<Session | null>(null);
 
   // Resend verification from the dashboard
   const [resendMsg, setResendMsg] = useState('');
@@ -50,7 +54,7 @@ export default function App() {
 
   const handleHostGame = () => {
     if (currentUser) {
-      setView('app');
+      setView(currentUser.emailVerified && session ? 'host' : 'app');
     } else {
       resetForm();
       setView('login');
@@ -122,6 +126,7 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
+      setSession({ accessToken: data.accessToken, refreshToken: data.refreshToken, issuedAt: Date.now() });
       setView('app');
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -136,6 +141,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setSession(null);
     setResendMsg('');
     resetForm();
     setView('landing');
@@ -269,6 +275,11 @@ export default function App() {
         </div>
       )}
 
+      {/* HOST VIEW: create a room and run the shared screen */}
+      {view === 'host' && currentUser && session && (
+        <HostScreen session={session} onSessionChange={setSession} onExit={() => setView('app')} />
+      )}
+
       {/* DASHBOARD VIEW */}
       {view === 'app' && currentUser && (
         <div className="dashboard-card">
@@ -281,6 +292,12 @@ export default function App() {
               Sign Out
             </button>
           </div>
+
+          {currentUser.emailVerified && session && (
+            <button type="button" className="btn-primary" onClick={() => setView('host')} style={{ marginBottom: '1.5rem' }}>
+              Host a game
+            </button>
+          )}
 
           {!currentUser.emailVerified && (
             <div className="alert-error" role="alert">
