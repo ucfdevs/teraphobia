@@ -5,8 +5,13 @@ import SocketIO
 // The phone's side of the lobby (FR-5, FR-6): checks the code over REST, then takes a seat over socket.io.
 @Observable
 final class RoomClient {
-    // The Simulator reaches the server running on this Mac. Swap in the Droplet domain for TestFlight.
+    // The Simulator reaches the server running on this Mac. A real iPhone, run from Xcode or TestFlight,
+    // uses the live server: on a phone, localhost would be the phone itself.
+    #if targetEnvironment(simulator)
     static let serverURL = URL(string: "http://localhost:4000")!
+    #else
+    static let serverURL = URL(string: "https://teraphobia.com")!
+    #endif
 
     var isJoining = false
     var joined = false
