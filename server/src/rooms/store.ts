@@ -1,14 +1,17 @@
-import { randomInt } from 'node:crypto'
+import { randomInt, randomUUID } from 'node:crypto'
 import type { Preset } from '../models/game.js'
 
-// Live rooms live in memory only (PRD). The socket handlers will import this module.
+// Live rooms live in memory only (PRD). The socket handlers in src/sockets use this module.
 
 export const MAX_PLAYERS = 8
+export const MIN_PLAYERS = 4
 const CODE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const CODE_LENGTH = 4
 
 export interface Seat {
+  seatId: string
   displayName: string
+  connected: boolean
   userId?: string
 }
 
@@ -16,6 +19,7 @@ export interface Room {
   code: string
   preset: Preset
   hostUserId: string
+  hostConnected: boolean
   createdAt: Date
   startedAt?: Date
   seats: Seat[]
@@ -44,7 +48,7 @@ export function createRoom(hostUserId: string, preset: Preset): Room {
   for (let attempt = 0; attempt < 1000; attempt += 1) {
     const code = randomCode()
     if (rooms.has(code)) continue
-    const room: Room = { code, preset, hostUserId, createdAt: new Date(), seats: [] }
+    const room: Room = { code, preset, hostUserId, hostConnected: false, createdAt: new Date(), seats: [] }
     rooms.set(code, room)
     return room
   }
@@ -53,6 +57,30 @@ export function createRoom(hostUserId: string, preset: Preset): Room {
 
 export function getRoom(code: string) {
   return rooms.get(normalizeCode(code))
+}
+
+export function findRoomByHost(hostUserId: string) {
+  for (const room of rooms.values()) {
+    if (room.hostUserId === hostUserId) return room
+  }
+  return undefined
+}
+
+// Names are unique within a room, ignoring case and surrounding spaces.
+export function nameTaken(room: Room, displayName: string) {
+  const wanted = displayName.trim().toLowerCase()
+  return room.seats.some((seat) => seat.displayName.toLowerCase() === wanted)
+}
+
+export function addSeat(room: Room, displayName: string): Seat {
+  const seat: Seat = { seatId: randomUUID(), displayName: displayName.trim(), connected: true }
+  room.seats.push(seat)
+  return seat
+}
+
+export function removeSeat(room: Room, seatId: string) {
+  const index = room.seats.findIndex((seat) => seat.seatId === seatId)
+  return index === -1 ? undefined : room.seats.splice(index, 1)[0]
 }
 
 export function roomStatus(room: Room): RoomStatus {
