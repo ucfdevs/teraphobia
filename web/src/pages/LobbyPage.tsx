@@ -1,15 +1,24 @@
 import QRCode from 'react-qr-code';
 import React from 'react';
 import ReactDOM from "react-dom";
+import { useState } from 'react';
 
 import logo from '../assets/logo.svg';
 import LobbyUser from '../components/LobbyUser';
 
 import "./lobby.css"
 
-export default function LobbyPage() {
-    
+interface User {
+    id: number;
+    profileSrc: string;
+    username: string;
+}
 
+
+
+export default function LobbyPage() {
+    const [userList, setUsers] = useState<User[]>([])
+    
     /**
      * Takes a string and converts it into the code to be displayed on the webpage
      * @param code A string with 6 numberical digits
@@ -37,10 +46,20 @@ export default function LobbyPage() {
         return SanitizeLobbyCode(code);
     }
 
+    function AddMockData() {
+        const userid = crypto.randomUUID();
+        const newUser: User = {
+            id: Number(userid),
+            username: 'user' + userid,
+            profileSrc: 'profile' + userid,
+        };
+        setUsers((prev) => [...prev, newUser])
+    }
+
     
     const lobbyCode = GetLobbyCode();
 
-    //var userList: ReactNode[];
+
     return (
         <>
         <div id="lobbyheader">
@@ -60,12 +79,18 @@ export default function LobbyPage() {
             <div className='seperator'></div>
         </div>
         <div className="user-list">
-            <LobbyUser username='Example' profileSrc='sanitized'/>
-            <LobbyUser username='Example' profileSrc='sanitized'/>
-            <LobbyUser username='Example' profileSrc='sanitized'/>
-            <LobbyUser username='Example' profileSrc='sanitized'/>
+            <ul>
+                {
+                    userList.map((user) => (
+                        <li key={user.id}>
+                            <LobbyUser username={user.username} profileSrc={user.profileSrc}></LobbyUser>
+                        </li>
+                    ))
+                }
+            </ul>
         </div>
         <button className='start-game-button'>Start Game</button>
+        <button onClick={AddMockData} className='dev-mock-data'>Add Mock Data</button>
         </>
     )
 }
