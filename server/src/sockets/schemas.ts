@@ -29,6 +29,7 @@ export const SERVER_EVENTS = [
   'phase:start',
   'room:state',
   'vote:reveal',
+  'you:joined',
   'you:rejoined',
   'you:result',
   'you:role',

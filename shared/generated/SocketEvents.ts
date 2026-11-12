@@ -168,6 +168,18 @@ export interface Vote {
 }
 
 /**
+ * Server to one, event `you:joined`. Sent when a phone takes a seat. The phone keeps the
+ * rejoin token and sends it in `room:join` to get the same seat back after a drop.
+ */
+export interface YouJoined {
+    /**
+     * Signed token for this room and seat. Store it on the device; never show it.
+     */
+    rejoinToken: string;
+    seatId:      string;
+}
+
+/**
  * Server to one, event `you:rejoined`. Everything this player already knows, sent after
  * they reconnect to their seat. Contains nothing they weren't sent before.
  */
