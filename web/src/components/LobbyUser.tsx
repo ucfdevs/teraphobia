@@ -14,10 +14,10 @@ function LobbyUser({id, username, profileSrc, removeself}: UserData) {
             <p className='playerName'>{username}</p>
             <div className='userOptions'>
                 <button className='editUserOptionsButton'>
-
+                    Edit User Settings
                 </button>
                 <button className='removeUserButton' onClick={() => {removeself(id)}}>
-
+                    Kick User
                 </button>
             </div>
         </div>
