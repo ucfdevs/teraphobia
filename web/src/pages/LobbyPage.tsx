@@ -1,7 +1,7 @@
 import QRCode from 'react-qr-code';
 import React from 'react';
 import ReactDOM from "react-dom";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import logo from '../assets/logo.svg';
 import LobbyUser from '../components/LobbyUser';
@@ -14,10 +14,9 @@ interface User {
     username: string;
 }
 
-
-
 export default function LobbyPage() {
     const [userList, setUsers] = useState<User[]>([])
+    const [userListLen, setListLen] = useState<number>(0);
     const [buttonStatus, setButtonStatus] = useState<string>('disabled');
     
     /**
@@ -57,14 +56,23 @@ export default function LobbyPage() {
             profileSrc: 'profile' + userid,
         };
         setUsers((prev) => [...prev, newUser])
+        setListLen(userListLen => userListLen + 1);
+    }
 
-        if (userList.length > 2) {
+    const RemoveUser = (idToRemove: string) => {
+        setUsers((prev) => prev.filter((item) => item.id !== idToRemove))
+        setListLen(userListLen => userListLen - 1);
+    }
+
+    useEffect (() => {
+        console.log(userListLen)
+        if (userListLen > 3) {
             setButtonStatus('enabled')
         }
         else {
             setButtonStatus('disabled');
         }
-    }
+    }, [userListLen]);
 
     
     const lobbyCode = GetLobbyCode();
@@ -93,7 +101,7 @@ export default function LobbyPage() {
                 {
                     userList.map((user) => (
                         <li key={user.id}>
-                            <LobbyUser username={user.username} profileSrc={user.profileSrc}></LobbyUser>
+                            <LobbyUser id={user.id} username={user.username} profileSrc={user.profileSrc} removeself={() => RemoveUser(user.id)}></LobbyUser>
                         </li>
                     ))
                 }
