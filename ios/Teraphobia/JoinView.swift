@@ -7,6 +7,7 @@ struct JoinView: View {
 
     @State private var roomCode = ""
     @State private var displayName = ""
+    @State private var client = RoomClient()
     @FocusState private var focusedField: Field?
 
     var body: some View {
@@ -32,23 +33,40 @@ struct JoinView: View {
                         .submitLabel(.done)
                         .onChange(of: displayName) {
                             displayName = String(displayName.prefix(JoinValidation.maxNameLength))
+                            client.nameError = nil
                         }
                         .accessibilityLabel("Display name")
                         .accessibilityHint("1 to 16 characters")
+
+                    if let nameError = client.nameError {
+                        Text(nameError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
                 } footer: {
                     Text("Ask the host for the 4-letter code on the shared screen.")
                 }
 
                 Button("Join") {
-                    // Wired to GET /rooms/:code in a later issue
+                    Task {
+                        await client.join(code: roomCode, displayName: displayName.trimmingCharacters(in: .whitespaces))
+                    }
                 }
-                .disabled(!JoinValidation.canJoin(code: roomCode, name: displayName))
+                .disabled(!JoinValidation.canJoin(code: roomCode, name: displayName) || client.isJoining)
+
+                if let roomError = client.roomError {
+                    Text(roomError)
+                        .foregroundStyle(.red)
+                }
 
                 NavigationLink("Sign in") {
                     SignInView()
                 }
             }
             .navigationTitle("Teraphobia")
+            .navigationDestination(isPresented: $client.joined) {
+                WaitingRoomView(client: client)
+            }
         }
         .tint(.orange)
     }
