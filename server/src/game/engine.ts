@@ -86,6 +86,10 @@ export class GameEngine {
   readonly lastCandleTarget = new Map<string, string>()
   // Every private Day result each player has received, oldest first (for rejoins).
   readonly results = new Map<string, DayResult[]>()
+  // The Monster's once-per-game power.
+  powerUsed = false
+  // Today's Vampire block or Witch fake, resolved at Day end.
+  private powerTarget: string | undefined
 
   constructor(seatIds: string[], readonly rng: Rng) {
     const { costumes, monsterIndex, monsterType } = deal(seatIds.length, rng)
@@ -132,7 +136,10 @@ export class GameEngine {
 
     if ('victimIds' in submit) {
       if (player.role !== 'monster') return reject('not_allowed', 'Only the Monster picks a victim')
-      if (submit.victimIds.length > 1) return reject('not_allowed', 'Only one victim tonight')
+      if (submit.victimIds.length > 1) {
+        const refused = this.werewolfRefusal()
+        if (refused) return refused
+      }
       for (const id of submit.victimIds) {
         if (id === seatId) return reject('invalid_target', 'The Monster cannot pick itself')
         if (!this.alive(id)) return reject('invalid_target', 'Pick a living player')
@@ -164,7 +171,28 @@ export class GameEngine {
     return null
   }
 
+  // Why a double kill isn't allowed tonight, or null if it is.
+  private werewolfRefusal(): Rejection | null {
+    if (this.monsterType !== 'werewolf') return reject('not_allowed', 'Only one victim tonight')
+    if (this.powerUsed) return reject('power_used', 'The power is already used')
+    if (this.round === 1) return reject('wrong_phase', 'The Werewolf can’t kill twice on Night 1')
+    return null
+  }
+
+  // Vampire and Witch powers, during Day. The Werewolf's double kill goes through night:submit.
+  usePower(seatId: string, targetId: string): Rejection | null {
+    const player = this.player(seatId)
+    if (!player || player.role !== 'monster' || player.lifeStatus !== 'alive') return reject('not_allowed', 'Only the Monster has a power')
+    if (this.monsterType === 'werewolf') return reject('not_allowed', 'The Werewolf kills twice with night:submit')
+    if (this.phase !== 'day') return reject('wrong_phase', 'The power can only be used during Day')
+    if (this.powerUsed || this.powerTarget) return reject('power_used', 'The power is already used')
+    if (targetId === seatId || !this.alive(targetId)) return reject('invalid_target', 'Pick another living player')
+    this.powerTarget = targetId
+    return null
+  }
+
   private resolveNight(): Outbound[] {
+    if (this.victimIds.length > 1) this.powerUsed = true
     const deadIds = this.victimIds.filter((id) => this.alive(id) && !this.protectedTonight.has(id))
     for (const id of deadIds) this.player(id)!.lifeStatus = 'dead'
     for (const [seatId, suspectId] of this.suspects) this.hunches.push({ seatId, round: this.round, suspectId })
@@ -191,7 +219,16 @@ export class GameEngine {
   private resolveDay(): Outbound[] {
     const round = this.round
     const results = new Map<string, DayResult>()
-    const takers = (action: DayAction) => shuffle(this.rng, [...this.dayActions].filter(([, a]) => a.action === action).map(([id]) => id))
+    const blocked = this.monsterType === 'vampire' ? this.powerTarget : undefined
+    const witchTarget = this.monsterType === 'witch' ? this.powerTarget : undefined
+    // A blocked player, and the Witch's target when Searching, don't take a success slot; theirs are set below.
+    const takers = (action: DayAction) =>
+      shuffle(
+        this.rng,
+        [...this.dayActions]
+          .filter(([id, a]) => a.action === action && id !== blocked && !(action === 'search' && id === witchTarget))
+          .map(([id]) => id),
+      )
 
     // Searches: up to SEARCH_CAP random searchers succeed; the rest find nothing.
     takers('search').forEach((seatId, i) => {
@@ -209,10 +246,23 @@ export class GameEngine {
     this.lastCandleTarget.clear()
     for (const [seatId, action] of this.dayActions) {
       if (action.action !== 'candle') continue
-      this.protectedTonight.add(action.targetId!)
       this.lastCandleTarget.set(seatId, action.targetId!)
-      results.set(seatId, { round, action: 'candle', candleBlocked: false })
+      if (seatId !== blocked) this.protectedTonight.add(action.targetId!)
+      results.set(seatId, { round, action: 'candle', candleBlocked: seatId === blocked })
     }
+
+    // Vampire: a blocked Search or Commune looks exactly like an empty one.
+    const blockedAction = blocked && this.dayActions.get(blocked)?.action
+    if (blocked && (blockedAction === 'search' || blockedAction === 'commune')) {
+      results.set(blocked, { round, action: blockedAction, trait: null })
+    }
+
+    // Witch: the target's Search gets a fake trait that looks like a real one. No Search, and the power is kept.
+    const witchFaked = witchTarget !== undefined && this.dayActions.get(witchTarget)?.action === 'search'
+    if (witchFaked) results.set(witchTarget, { round, action: 'search', trait: this.notMonsterTrait() })
+
+    if (blocked || witchFaked) this.powerUsed = true
+    this.powerTarget = undefined
 
     this.dayActions.clear()
     // Seat order, so nothing about the shuffle leaks through timing.
