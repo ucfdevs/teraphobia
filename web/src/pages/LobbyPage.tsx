@@ -1,28 +1,28 @@
 import QRCode from "react-qr-code";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import logo from "../assets/logo.svg";
 import LobbyUser from "../components/LobbyUser";
 import type { GamePreset } from "./HostLobbyPage";
+import { EMPTY_MOCK_LOBBY, type MockLobbyPlayer } from "../mocks/lobby";
 
 import '../App.css';
 import './lobby.css';
 
-interface User {
-    id: string;
-    profileSrc: string;
-    username: string;
-}
-
 interface LobbyPageProps {
     maxPlayers?: number;
     preset?: GamePreset;
+    initialPlayers?: MockLobbyPlayer[];
     onBack?: () => void;
 }
 
-export default function LobbyPage({ maxPlayers = 8, preset = 'Normal', onBack }: LobbyPageProps) {
-    const [userList, setUsers] = useState<User[]>([]);
-    const [userListSize, setUserListSize] = useState<number>(0);
-    const [buttonStatus, setButtonStatus] = useState<'disabled' | 'enabled'>('disabled');
+export default function LobbyPage({
+    maxPlayers = EMPTY_MOCK_LOBBY.maxPlayers,
+    preset = EMPTY_MOCK_LOBBY.preset,
+    initialPlayers = EMPTY_MOCK_LOBBY.players,
+    onBack,
+}: LobbyPageProps) {
+    const [userList, setUsers] = useState<MockLobbyPlayer[]>(initialPlayers);
+    const [userListSize, setUserListSize] = useState<number>(initialPlayers.length);
 
     function SanitizeLobbyCode(code: string): string {
         if (isNaN(parseInt(code))) {
@@ -35,8 +35,7 @@ export default function LobbyPage({ maxPlayers = 8, preset = 'Normal', onBack }:
     }
 
     function GetLobbyCode(): string {
-        const code = '654321';
-        return SanitizeLobbyCode(code);
+        return SanitizeLobbyCode(EMPTY_MOCK_LOBBY.code);
     }
 
     const RemoveUser = (idToRemove: string) => {
@@ -44,18 +43,11 @@ export default function LobbyPage({ maxPlayers = 8, preset = 'Normal', onBack }:
         setUserListSize((prev) => prev - 1);
     };
 
-    useEffect(() => {
-        if (userListSize >= 4 && userListSize <= maxPlayers) {
-            setButtonStatus('enabled');
-        } else {
-            setButtonStatus('disabled');
-        }
-    }, [userListSize, maxPlayers]);
-
     const lobbyCode = GetLobbyCode();
-    const isStartDisabled = buttonStatus === 'disabled';
+    const isRoomFull = userListSize >= maxPlayers;
+    const isStartDisabled = userListSize < 4 || userListSize > maxPlayers;
+    const buttonStatus = isStartDisabled ? 'disabled' : 'enabled';
     const playersNeeded = Math.max(0, 4 - userListSize);
-
     return (
         <div className="app-wrapper">
             <div className="fog-wrapper" aria-hidden="true">
@@ -92,7 +84,7 @@ export default function LobbyPage({ maxPlayers = 8, preset = 'Normal', onBack }:
 
                 <section className="lobby-players-section" aria-live="polite">
                     <h2 className="lobby-players-count">
-                        Players {userListSize}/{maxPlayers}
+                        Players {userListSize}/{maxPlayers}{isRoomFull ? ' · Room full' : ''}
                     </h2>
 
                     {userList.length === 0 ? (
