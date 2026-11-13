@@ -1,51 +1,92 @@
+import '../App.css'
 import './hostlobbypage.css'
 import { useState } from 'react'
+import logo from '../assets/logo.svg'
 
-export default function HostLobbyPage() {
+export type GamePreset = 'Quick' | 'Normal' | 'Relaxed'
 
-    const [vampOdds, setVampOdds] = useState<number>(40);
-    const [wolfOdds, setWolfOdds] = useState<number>(20);
-    const [witchOdds, setWitchOdds] = useState<number>(40);
+interface HostLobbyPageProps {
+    onCreateLobby?: (settings: {
+        preset: GamePreset
+        maxPlayers: number
+    }) => void
+    onBack?: () => void
+}
+
+const PRESETS: { name: GamePreset; description: string }[] = [
+    { name: 'Quick', description: 'About 1.5 minutes a round' },
+    { name: 'Normal', description: 'About 2.5 minutes a round' },
+    { name: 'Relaxed', description: 'About 4 minutes a round' },
+]
+
+export default function HostLobbyPage({ onCreateLobby, onBack }: HostLobbyPageProps) {
+    const [preset, setPreset] = useState<GamePreset>('Normal')
+
+    const handleCreate = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (onCreateLobby) {
+            onCreateLobby({ preset, maxPlayers: 8 })
+        }
+    }
 
     return (
-        <>
-        <div>
-            <h1>Host a Teraphobia Game</h1>
-            <div className='options-enable-werewolf'>
-                
+        <div className="app-wrapper">
+            <div className="fog-wrapper" aria-hidden="true">
+                <div className="fog-layer-1"></div>
+                <div className="fog-layer-2"></div>
             </div>
-            <div className='options-killer-role'>
-                <h2 className='killer-role-text'>Change Killer Role Odds</h2>
-                <div className='killer-role-button-container'>
-                    <div className='vampire-container'>
-                        <label htmlFor='role-vampire'>Vampire Odds</label>
-                        <input onChange={(e) => setVampOdds(Number(e.target.value))} value={vampOdds} id='role-vampire' className='killer-role-number' type='number' min={0} max={100}></input>
-                        <input onChange={(e) => setVampOdds(Number(e.target.value))} value={vampOdds} className='killer-role-slider' type='range' min={0} max={100}></input>
+
+            <header className="brand-header">
+                <img src={logo} alt="Teraphobia" className="brand-logo" />
+                <p className="brand-subtitle">HALLOWEEN SOCIAL DEDUCTION GAME</p>
+            </header>
+
+            <main className="create-room-card">
+                <h1 className="create-room-title">Create a room</h1>
+                <form onSubmit={handleCreate} className="create-room-form">
+                    <fieldset className="timer-preset-fieldset">
+                        <legend className="timer-preset-legend">TIMER PRESET</legend>
+                        <div className="preset-stack">
+                            {PRESETS.map((item) => {
+                                const isSelected = preset === item.name
+                                return (
+                                    <label
+                                        key={item.name}
+                                        className={`preset-radio-card ${isSelected ? 'selected' : ''}`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="timer-preset"
+                                            value={item.name}
+                                            checked={isSelected}
+                                            onChange={() => setPreset(item.name)}
+                                            className="preset-radio-input"
+                                        />
+                                        <span className="preset-radio-circle" aria-hidden="true"></span>
+                                        <span className="preset-radio-text">
+                                            <span className="preset-radio-title">{item.name}</span>
+                                            <span className="preset-radio-desc">{item.description}</span>
+                                        </span>
+                                    </label>
+                                )
+                            })}
+                        </div>
+                    </fieldset>
+
+                    <div className="create-room-footer">
+                        <button
+                            type="button"
+                            className="back-room-button"
+                            onClick={onBack}
+                        >
+                            Back
+                        </button>
+                        <button type="submit" className="create-room-submit">
+                            Create room
+                        </button>
                     </div>
-                    <div className='witch-container'>
-                        <label htmlFor='role-witch'>Witch Odds</label>
-                        <input onChange={(e) => setWitchOdds(Number(e.target.value))} value={witchOdds} id='role-witch' className='killer-role-number' type='number' min={0} max={100}></input>
-                        <input onChange={(e) => setWitchOdds(Number(e.target.value))} value={witchOdds} className='killer-role-slider' type='range' min={0} max={100}></input>
-                    </div>
-                    <div className='werewolf-container'>
-                        <label htmlFor='role-wolf'>Werewolf Odds</label>
-                        <input onChange={(e) => setWolfOdds(Number(e.target.value))} value={wolfOdds} id='role-wolf' className='killer-role-number' type='number' min={0} max={100}></input>
-                        <input onChange={(e) => setWolfOdds(Number(e.target.value))} value={wolfOdds} className='killer-role-slider' type='range' min={0} max={100}></input>
-                    </div>
-                </div>
-            </div>
-            <div className='options-max-players'>
-                <h2 className="max-players-text">Max Players</h2>
-                <div className="max-players-button-container">
-                    <button className="max-players-button" value={1}>1</button>
-                    <button className="max-players-button" value={2}>2</button>
-                    <button className="max-players-button" value={3}>3</button>
-                    <button className="max-players-button" value={4}>4</button>
-                    <button className="max-players-button" value={5}>5</button>
-                    <button className="max-players-button" value={6}>6</button>
-                </div>
-            </div>
+                </form>
+            </main>
         </div>
-        </>
     )
 }

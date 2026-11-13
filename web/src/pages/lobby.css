@@ -1,40 +1,165 @@
-
-#lobbyheader {
+.lobby-card {
+    width: 100%;
+    max-width: 580px;
+    background-color: #121013;
+    border: 1px solid #2a2226;
+    border-radius: 14px;
+    padding: 2.25rem 2rem;
+    margin-bottom: 2.5rem;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75);
+    position: relative;
+    z-index: 2;
     display: flex;
-    flex-direction: row;
-}
-
-.seperator {
-    height: 5px;
-    background-color: red;
-    width: 90%;
-    margin-left: 5%;
-}
-
-.user-list {
-    display: flex;
-    width: 90%;
-    height: 500px;
-    margin-left: 5%;
     flex-direction: column;
+    align-items: center;
+    text-align: center;
 }
 
-.start-game-button {
-    background-color: red;
-    border-radius: 5px;
+.lobby-join-heading {
+    color: #e4e4e7;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+}
+
+.lobby-code-display {
+    color: #ff6a00;
+    font-size: clamp(3rem, 9vw, 4.75rem);
+    font-weight: 800;
+    letter-spacing: 0.28em;
+    padding-left: 0.28em;
+    line-height: 1.1;
+    margin: 0.25rem 0 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.lobby-instructions {
+    color: #a1a1aa;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    max-width: 430px;
+    margin: 0 0 1.25rem;
+}
+
+.lobby-qr-details {
+    margin-bottom: 1.25rem;
+}
+
+.lobby-qr-summary {
+    cursor: pointer;
+    color: #a1a1aa;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    list-style: none;
+}
+
+.lobby-qr-summary::-webkit-details-marker {
+    display: none;
+}
+
+.lobby-qr-summary:hover {
+    color: #ffffff;
+}
+
+.lobby-qr-box {
+    margin-top: 0.75rem;
+    padding: 0.65rem;
+    background-color: #ffffff;
+    border-radius: 10px;
+    display: inline-flex;
+}
+
+.lobby-players-section {
+    width: 100%;
+    margin: 0.25rem 0 1.5rem;
+}
+
+.lobby-players-count {
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin: 0 0 0.6rem;
+}
+
+.lobby-waiting-text {
+    color: #a1a1aa;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.lobby-user-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.lobby-start-button {
+    width: 100%;
+    padding: 0.95rem 1.5rem;
+    border-radius: 8px;
     border: none;
-    width: fit-content;
-    padding: 10px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
 }
 
-.start-game-button:hover {
+.lobby-start-button.disabled,
+.lobby-start-button:disabled {
+    background-color: #4c1418;
+    color: #a1a1aa;
+    cursor: not-allowed;
+}
+
+.lobby-start-button.enabled:not(:disabled) {
+    background-color: #b91c1c;
+    color: #ffffff;
     cursor: pointer;
 }
 
-ul {
-    list-style-type: none;
+.lobby-start-button.enabled:not(:disabled):hover {
+    background-color: #991b1b;
 }
 
-.button-disabled {
-    opacity: 50%;
+.lobby-dev-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.lobby-secondary-btn {
+    padding: 0.5rem 0.9rem;
+    background-color: #1c191d;
+    color: #d4d4d8;
+    border: 1px solid #322a30;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.lobby-secondary-btn:hover:not(:disabled) {
+    background-color: #272228;
+    border-color: #52444d;
+    color: #ffffff;
+}
+
+.lobby-secondary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.lobby-start-button:focus-visible,
+.lobby-secondary-btn:focus-visible,
+.lobby-qr-summary:focus-visible {
+    outline: 3px solid #facc15;
+    outline-offset: 2px;
 }

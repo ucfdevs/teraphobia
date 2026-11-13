@@ -1,12 +1,11 @@
-import QRCode from 'react-qr-code';
-import React from 'react';
-import ReactDOM from "react-dom";
-import { useState, useEffect } from 'react';
+import QRCode from "react-qr-code";
+import { useEffect, useState } from "react";
+import logo from "../assets/logo.svg";
+import LobbyUser from "../components/LobbyUser";
+import type { GamePreset } from "./HostLobbyPage";
 
-import logo from '../assets/logo.svg';
-import LobbyUser from '../components/LobbyUser';
-
-import "./lobby.css"
+import '../App.css';
+import './lobby.css';
 
 interface User {
     id: string;
@@ -14,101 +13,122 @@ interface User {
     username: string;
 }
 
-export default function LobbyPage() {
-    const [userList, setUsers] = useState<User[]>([])
-    const [userListLen, setListLen] = useState<number>(0);
-    const [buttonStatus, setButtonStatus] = useState<string>('disabled');
-    
-    /**
-     * Takes a string and converts it into the code to be displayed on the webpage
-     * @param code A string with 6 numberical digits
-     * @returns A sanitized string with a dash to seperate the two parts of the code
-     */
-    function SanitizeLobbyCode(code: string) : string {
-        
-        // Checks if code is not a number
+interface LobbyPageProps {
+    maxPlayers?: number;
+    preset?: GamePreset;
+    onBack?: () => void;
+}
+
+export default function LobbyPage({ maxPlayers = 8, preset = 'Normal', onBack }: LobbyPageProps) {
+    const [userList, setUsers] = useState<User[]>([]);
+    const [userListSize, setUserListSize] = useState<number>(0);
+    const [buttonStatus, setButtonStatus] = useState<'disabled' | 'enabled'>('disabled');
+
+    function SanitizeLobbyCode(code: string): string {
         if (isNaN(parseInt(code))) {
             return "Invalid lobby code";
         }
-        // Checks if code length is correct
         if (code.length != 6) {
             return "Code not 6 digits";
         }
-
         return code;
     }
 
-    function GetLobbyCode() {
-        const code = '654321'
-
-        // !!! --- Uses API to get the lobby code
-
+    function GetLobbyCode(): string {
+        const code = '654321';
         return SanitizeLobbyCode(code);
     }
 
-    // !!! -- Needs to pull from actual user data
-    // !!! -- Currently only creates mock data
-    async function AddData() {
-        const userid = crypto.randomUUID();
-        const newUser: User = {
-            id: userid,
-            username: 'user ' + userid,
-            profileSrc: 'profile' + userid,
-        };
-        setUsers((prev) => [...prev, newUser])
-        setListLen(userListLen => userListLen + 1);
-    }
-
     const RemoveUser = (idToRemove: string) => {
-        setUsers((prev) => prev.filter((item) => item.id !== idToRemove))
-        setListLen(userListLen => userListLen - 1);
-    }
+        setUsers((prev) => prev.filter((item) => item.id !== idToRemove));
+        setUserListSize((prev) => prev - 1);
+    };
 
-    useEffect (() => {
-        console.log(userListLen)
-        if (userListLen > 3) {
-            setButtonStatus('enabled')
-        }
-        else {
+    useEffect(() => {
+        if (userListSize >= 4 && userListSize <= maxPlayers) {
+            setButtonStatus('enabled');
+        } else {
             setButtonStatus('disabled');
         }
-    }, [userListLen]);
+    }, [userListSize, maxPlayers]);
 
-    
     const lobbyCode = GetLobbyCode();
-
+    const isStartDisabled = buttonStatus === 'disabled';
+    const playersNeeded = Math.max(0, 4 - userListSize);
 
     return (
-        <>
-        <div id="lobbyheader">
-            <img id='logo' src={logo}></img>
-            <div id='codeheader'>
-                <p id='jointext'>Join at Teraphobia.com/join</p>
-                <div id='lobbycode'>
+        <div className="app-wrapper">
+            <div className="fog-wrapper" aria-hidden="true">
+                <div className="fog-layer-1"></div>
+                <div className="fog-layer-2"></div>
+            </div>
+
+            <header className="brand-header">
+                <img src={logo} alt="Teraphobia" className="brand-logo" />
+                <p className="brand-subtitle">HALLOWEEN SOCIAL DEDUCTION GAME</p>
+            </header>
+
+            <main className="lobby-card">
+                <p className="lobby-join-heading">Join on your phone with code</p>
+
+                <div className="lobby-code-display" aria-label={`Lobby code ${lobbyCode}`}>
                     {lobbyCode}
                 </div>
-                <div className='lobby-qr-code'>
-                    <QRCode value={'https://teraphobia.com/join/' + lobbyCode}></QRCode>
-                </div>
-            </div>
+
+                <p className="lobby-instructions">
+                    Open the Teraphobia app, enter the code and your name. Preset: {preset.toLowerCase()}.
+                </p>
+
+                <details className="lobby-qr-details">
+                    <summary className="lobby-qr-summary">Show QR Code</summary>
+                    <div className="lobby-qr-box">
+                        <QRCode
+                            size={128}
+                            value={`https://teraphobia.com/join/${lobbyCode}`}
+                            title={`Join lobby ${lobbyCode}`}
+                        />
+                    </div>
+                </details>
+
+                <section className="lobby-players-section" aria-live="polite">
+                    <h2 className="lobby-players-count">
+                        Players {userListSize}/{maxPlayers}
+                    </h2>
+
+                    {userList.length === 0 ? (
+                        <p className="lobby-waiting-text">Waiting for players...</p>
+                    ) : (
+                        <ul className="lobby-user-list">
+                            {userList.map((user) => (
+                                <li key={user.id}>
+                                    <LobbyUser
+                                        id={user.id}
+                                        username={user.username}
+                                        profileSrc={user.profileSrc}
+                                        removeself={RemoveUser}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+
+                <button
+                    type="button"
+                    className={`lobby-start-button ${buttonStatus}`}
+                    disabled={isStartDisabled}
+                >
+                    {isStartDisabled ? `Start (needs ${playersNeeded} more)` : 'Start Game'}
+                </button>
+
+                {onBack && (
+                    <div className="lobby-dev-actions">
+                        <button type="button" className="lobby-secondary-btn" onClick={onBack}>
+                            Back to Room Settings
+                        </button>
+                    </div>
+                )}
+            </main>
         </div>
-        <div className='userListHeader'>
-            <div className='usernameHeader'>Username</div>
-            <div className='seperator'></div>
-        </div>
-        <div className="user-list">
-            <ul>
-                {
-                    userList.map((user) => (
-                        <li key={user.id}>
-                            <LobbyUser id={user.id} username={user.username} profileSrc={user.profileSrc} removeself={() => RemoveUser(user.id)}></LobbyUser>
-                        </li>
-                    ))
-                }
-            </ul>
-        </div>
-        <button className={'button-' + buttonStatus + ' start-game-button'}>Start Game</button>
-        <button onClick={AddData} className='dev-mock-data'>Add Mock Data</button>
-        </>
-    )
+    );
 }
