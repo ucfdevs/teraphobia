@@ -60,6 +60,23 @@ final class AuthClient {
         _ = try? await post("logout", ["refreshToken": refreshToken])
     }
 
+    // Calls an /api route as the signed-in player. The access token lasts 15 minutes, so a 401 refreshes once and retries.
+    func send(_ method: String, _ path: String, query: [URLQueryItem] = [], body: [String: String]? = nil) async throws -> (status: Int, data: Data) {
+        var response = try await authorized(method, path, query, body)
+        if response.status == 401 {
+            await refresh()
+            response = try await authorized(method, path, query, body)
+        }
+        return response
+    }
+
+    // Keeps "Signed in as" on the Join screen in step with the name on the Profile.
+    func rename(to displayName: String) {
+        guard var next = session, next.user.displayName != displayName else { return }
+        next.user.displayName = displayName
+        save(next)
+    }
+
     private func start(_ path: String, _ body: [String: String]) async {
         error = nil
         isWorking = true
@@ -86,6 +103,22 @@ final class AuthClient {
         return ((response as? HTTPURLResponse)?.statusCode ?? 0, data)
     }
 
+    private func authorized(_ method: String, _ path: String, _ query: [URLQueryItem], _ body: [String: String]?) async throws -> (status: Int, data: Data) {
+        // Signed out (or signed out by a failed refresh): answer like the server would.
+        guard let accessToken = session?.accessToken else { return (401, Data()) }
+        var url = RoomClient.serverURL.appending(path: "api/\(path)")
+        if !query.isEmpty { url.append(queryItems: query) }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(body)
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        return ((response as? HTTPURLResponse)?.statusCode ?? 0, data)
+    }
+
     private func save(_ next: Session?) {
         session = next
         if let next, let data = try? JSONEncoder().encode(next) {
@@ -105,17 +138,17 @@ final class AuthClient {
 private struct Session: Codable {
     let accessToken: String
     let refreshToken: String
-    let user: AuthUser
+    var user: AuthUser
 }
 
 struct AuthUser: Codable {
     let id: String
     let email: String
-    let displayName: String
+    var displayName: String
     let emailVerified: Bool
 }
 
-// Failed auth routes answer { error }.
-private struct AuthError: Decodable {
+// Failed REST routes answer { error }.
+struct AuthError: Decodable {
     let error: String
 }
