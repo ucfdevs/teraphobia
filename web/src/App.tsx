@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage';
 import CreateRoomPage from './pages/CreateRoomPage';
 import LobbyPlaceholderPage from './pages/LobbyPlaceholderPage';
 import NotFoundPage from './pages/NotFoundPage';
+import JoinFallbackPage from './pages/JoinFallbackPage';
 
 interface RoleItem {
   id: number;
@@ -541,6 +542,18 @@ export default function App() {
           ) : (
             <Navigate replace to="/signin" />
           )
+        }
+      />
+
+      {/* ISSUE #34 JOIN LINK FALLBACK (app not installed) */}
+      <Route
+        path="/join/:code"
+        element={
+          <div className="app-wrapper">
+            {renderFog()}
+            {renderHeader()}
+            <JoinFallbackPage />
+          </div>
         }
       />
 
