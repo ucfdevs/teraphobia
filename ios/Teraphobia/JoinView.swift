@@ -64,6 +64,13 @@ struct JoinView: View {
                 }
             }
             .navigationTitle("Teraphobia")
+            // Scanning the join QR lands here with the code filled in, so only the name is left to type.
+            .onOpenURL { url in
+                if let code = JoinValidation.code(from: url) {
+                    roomCode = code
+                    focusedField = .displayName
+                }
+            }
             .navigationDestination(isPresented: $client.joined) {
                 GameView(client: client)
             }
