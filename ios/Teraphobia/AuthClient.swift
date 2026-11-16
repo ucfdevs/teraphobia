@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import GoogleSignIn
+import UIKit
 
 // Optional accounts (FR-1): email and password against /api/auth. The session is kept in the Keychain.
 @Observable
@@ -18,6 +20,25 @@ final class AuthClient {
         await start("login", ["email": email, "password": password])
     }
 
+    // FR-2: Google's sheet gives an ID token, and the server trades it for our own session.
+    func signInWithGoogle() async {
+        // Google's sheet is UIKit, so it needs a view controller to show over.
+        guard let root = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.keyWindow?.rootViewController else { return }
+        error = nil
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: root)
+            guard let idToken = result.user.idToken?.tokenString else {
+                error = "Google sign in failed"
+                return
+            }
+            await start("google", ["idToken": idToken])
+        } catch let googleError as GIDSignInError where googleError.code == .canceled {
+            // Closing Google's sheet isn't an error.
+        } catch {
+            self.error = "Google sign in failed"
+        }
+    }
+
     // Runs on launch. The server swaps the saved refresh token for a new pair, so a revoked session signs out here.
     func refresh() async {
         guard let refreshToken = session?.refreshToken else { return }
@@ -34,6 +55,8 @@ final class AuthClient {
         guard let refreshToken = session?.refreshToken else { return }
         // The token leaves the phone first; revoking it on the server is best effort.
         save(nil)
+        // Also forgets the Google account, so the next Google sign in asks which account to use.
+        GIDSignIn.sharedInstance.signOut()
         _ = try? await post("logout", ["refreshToken": refreshToken])
     }
 

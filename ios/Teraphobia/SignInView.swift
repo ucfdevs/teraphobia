@@ -103,6 +103,12 @@ struct SignInView: View {
         Button(mode.rawValue, action: submit)
             .disabled(!canSubmit || auth.isWorking)
 
+        // One button for both modes: the server creates the account on the first Google sign in.
+        Button("Sign in with Google") {
+            Task { await auth.signInWithGoogle() }
+        }
+        .disabled(auth.isWorking)
+
         if let error = auth.error {
             Text(error)
                 .foregroundStyle(.red)
