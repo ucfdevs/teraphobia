@@ -1,6 +1,7 @@
-import { randomInt } from 'node:crypto';
-// Live rooms live in memory only (PRD). The socket handlers will import this module.
+import { randomInt, randomUUID } from 'node:crypto';
+// Live rooms live in memory only (PRD). The socket handlers in src/sockets use this module.
 export const MAX_PLAYERS = 8;
+export const MIN_PLAYERS = 4;
 const CODE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const CODE_LENGTH = 4;
 const rooms = new Map();
@@ -24,7 +25,7 @@ export function createRoom(hostUserId, preset) {
         const code = randomCode();
         if (rooms.has(code))
             continue;
-        const room = { code, preset, hostUserId, createdAt: new Date(), seats: [] };
+        const room = { code, preset, hostUserId, hostConnected: false, createdAt: new Date(), seats: [] };
         rooms.set(code, room);
         return room;
     }
@@ -32,6 +33,27 @@ export function createRoom(hostUserId, preset) {
 }
 export function getRoom(code) {
     return rooms.get(normalizeCode(code));
+}
+export function findRoomByHost(hostUserId) {
+    for (const room of rooms.values()) {
+        if (room.hostUserId === hostUserId)
+            return room;
+    }
+    return undefined;
+}
+// Names are unique within a room, ignoring case and surrounding spaces.
+export function nameTaken(room, displayName) {
+    const wanted = displayName.trim().toLowerCase();
+    return room.seats.some((seat) => seat.displayName.toLowerCase() === wanted);
+}
+export function addSeat(room, displayName) {
+    const seat = { seatId: randomUUID(), displayName: displayName.trim(), connected: true };
+    room.seats.push(seat);
+    return seat;
+}
+export function removeSeat(room, seatId) {
+    const index = room.seats.findIndex((seat) => seat.seatId === seatId);
+    return index === -1 ? undefined : room.seats.splice(index, 1)[0];
 }
 export function roomStatus(room) {
     if (room.startedAt)

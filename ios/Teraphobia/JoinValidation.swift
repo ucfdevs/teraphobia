@@ -23,4 +23,12 @@ nonisolated enum JoinValidation {
     static func canJoin(code: String, name: String) -> Bool {
         isValidCode(code) && isValidName(name)
     }
+
+    // The join QR opens https://teraphobia.com/join/ABCD (#34). Any other link gives nil.
+    static func code(from url: URL) -> String? {
+        let parts = url.pathComponents // ["/", "join", "ABCD"]
+        guard parts.count == 3, parts[1] == "join" else { return nil }
+        let code = cleanCode(parts[2])
+        return isValidCode(code) ? code : nil
+    }
 }

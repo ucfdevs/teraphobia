@@ -1,0 +1,280 @@
+/* Host and shared screen. Only host- classes, built on the #14 tokens, so removing this file can't affect other pages. */
+
+.host-root,
+.host-card,
+.host-stage {
+  width: 100%;
+  max-width: 1100px;
+  position: relative;
+  z-index: 1;
+  /* Unitless, so bigger host text gets taller lines instead of the body's fixed px line height. */
+  line-height: var(--leading-normal);
+}
+
+.host-card,
+.host-stage {
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2xl);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+.host-card {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.host-title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.host-subtitle {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  margin: var(--space-xl) 0 var(--space-md);
+}
+
+.host-muted {
+  color: var(--color-muted-text);
+  margin: 0;
+}
+
+/* Big type, readable from across a room. */
+.host-lead {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-normal);
+  margin: var(--space-xl) 0;
+}
+
+.host-reveal {
+  font-family: var(--font-display);
+  font-size: clamp(var(--text-3xl), 5vw, 4rem);
+  line-height: var(--leading-tight);
+  margin: var(--space-2xl) 0;
+}
+
+.host-code {
+  font-family: var(--font-mono);
+  font-size: clamp(4rem, 14vw, 9rem);
+  font-weight: 600;
+  /* Unitless, so it scales with this font size. index.css gives body a % line-height, which inherits as a fixed px value. */
+  line-height: 1;
+  letter-spacing: 0.2em;
+  /* letter-spacing also trails the last letter; this keeps the code centered. */
+  padding-left: 0.2em;
+  color: var(--color-accent);
+  margin: var(--space-md) 0;
+  text-align: center;
+}
+
+.host-lobby {
+  text-align: center;
+}
+
+.host-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.host-start {
+  margin-top: var(--space-xl);
+  font-size: var(--text-xl);
+  padding: var(--space-lg) var(--space-2xl);
+}
+
+.host-presets {
+  border: none;
+  padding: 0;
+  margin: var(--space-xl) 0 0;
+  display: grid;
+  gap: var(--space-md);
+}
+
+.host-preset {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-md);
+  align-items: center;
+  padding: var(--space-lg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.host-preset input {
+  grid-row: span 2;
+  accent-color: var(--color-accent);
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.host-preset.is-selected {
+  border-color: var(--color-accent);
+}
+
+.host-preset:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.host-preset-label {
+  font-weight: 600;
+  font-size: var(--text-lg);
+}
+
+.host-players {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-sm);
+  text-align: left;
+}
+
+.host-player {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
+}
+
+.host-badge {
+  display: inline-block;
+  margin-left: var(--space-sm);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-hover);
+  color: var(--color-danger-light);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.host-phase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-xl);
+}
+
+.host-countdown {
+  font-family: var(--font-mono);
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-accent);
+  min-width: 3ch;
+  text-align: right;
+}
+
+.host-night {
+  background: linear-gradient(180deg, #050816 0%, var(--color-bg-elevated) 100%);
+}
+
+.host-moon {
+  width: 120px;
+  height: 120px;
+  margin: var(--space-2xl) auto 0;
+  border-radius: 50%;
+  background: #f8fafc;
+  box-shadow: 0 0 60px 10px rgba(248, 250, 252, 0.25), inset -24px -8px 0 0 #cbd5e1;
+}
+
+.host-seats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+
+.host-seat {
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.host-seat.is-out {
+  opacity: 0.55;
+}
+
+.host-seat-name {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  margin: 0 0 var(--space-sm);
+}
+
+.host-traits {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-muted-text);
+}
+
+.host-trait-shape {
+  display: inline-block;
+  width: 1.2em;
+  color: var(--color-text);
+}
+
+.host-votes {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-xl) 0 0;
+  display: grid;
+  gap: var(--space-sm);
+  font-size: var(--text-xl);
+}
+
+.host-toast {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.host-paused {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-content: center;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  text-align: center;
+  background: rgba(9, 13, 26, 0.92);
+  color: var(--color-text);
+  font-size: var(--text-xl);
+}
+
+@media (max-width: 640px) {
+  .host-card,
+  .host-stage {
+    padding: var(--space-lg);
+  }
+
+  .host-phase-header {
+    flex-direction: column-reverse;
+  }
+
+  .host-countdown {
+    text-align: left;
+  }
+}

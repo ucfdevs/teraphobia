@@ -1,0 +1,854 @@
+openapi: 3.0.3
+info:
+  title: Teraphobia REST API
+  version: 1.0.0
+  description: |
+    REST API for Teraphobia accounts, profiles, rooms, and game history. Live play runs over Socket.io;
+    those events are defined in `shared/schemas` and are not part of this spec.
+
+    **Auth.** Sign in with `POST /auth/register`, `/auth/login`, or `/auth/google` to get a short-lived
+    JWT access token (15 minutes) and an opaque refresh token (30 days). Send the access token as
+    `Authorization: Bearer <token>`. When it expires, trade the refresh token at `POST /auth/refresh` for a
+    new pair; each refresh token works once.
+
+    **Errors.** Every error response is `{ "error": "<message>" }`. The message is for display and logs;
+    branch on the status code.
+
+    **Rate limits.** Routes that answer `429` allow 20 requests per 15 minutes per IP and route (5 for the
+    routes that send email). Limited responses carry the IETF draft-8 `RateLimit` and `RateLimit-Policy`
+    headers.
+
+    Source of truth: `server/src/routes`. PRD: https://github.com/ucfdevs/teraphobia/blob/main/resources/PRD.md
+servers:
+  - url: https://teraphobia.com/api
+    description: Production (Droplet)
+  - url: http://localhost:4000/api
+    description: Local development (`npm run dev` in server/)
+# Signed-in routes by default; public routes say `security: []`.
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+    description: Accounts, sessions, email verification, and passwords
+  - name: Users
+    description: The signed-in user's profile, stats, and history
+  - name: Rooms
+    description: Creating and checking live rooms
+  - name: Games
+    description: Finished games
+  - name: Health
+    description: Deploy checks
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      security: []
+      summary: Create an account
+      description: |
+        Creates a password account with `emailVerified: false`, emails a verification link (valid 24 hours),
+        and signs the user in. If the email fails to send, registration still succeeds; the user can ask
+        for a new link with `POST /auth/resend-verification`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                  description: Trimmed and lowercased before saving.
+                  example: ana@example.com
+                password:
+                  type: string
+                  minLength: 8
+                  description: At least 8 characters and at most 72 bytes.
+                  example: correct-horse-battery
+                displayName:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  description: Trimmed. Defaults to the part of the email before `@` (first 32 characters).
+                  example: Ana
+      responses:
+        '201':
+          description: Account created and signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400':
+          description: Invalid email, password, or display name
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                email: { value: { error: A valid email is required } }
+                password: { value: { error: Password must be at least 8 characters } }
+                displayName: { value: { error: Display name must be 1 to 32 characters } }
+        '409':
+          description: The email is already registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Email is already registered }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: ana@example.com
+                password:
+                  type: string
+                  example: correct-horse-battery
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400':
+          description: Email or password missing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Email and password are required }
+        '401':
+          description: Wrong email or password (the same answer for both, so emails can't be probed)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Invalid email or password }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyEmail
+      security: []
+      summary: Confirm an email with the token from the verification link
+      description: |
+        The link in the email is `${APP_URL}/verify?token=<token>`; the web page posts that token here.
+        A token works once. Verifying also ends every other verification link for the account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Email verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+              example: { message: Email verified }
+        '400':
+          description: Unknown, used, or expired token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This link is invalid or has expired }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/resend-verification:
+    post:
+      tags: [Auth]
+      operationId: resendVerification
+      security: []
+      summary: Email a new verification link
+      description: |
+        Always answers the same 200, so it never reveals whether an email is registered. Sends only if the
+        account exists, is unverified, and no link was sent in the last 24 hours. Limited to 5 requests
+        per 15 minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Same answer for every email
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+              example: { message: 'If that account needs verifying, a new link is on its way' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/google:
+    post:
+      tags: [Auth]
+      operationId: googleSignIn
+      security: []
+      summary: Sign in with a Google ID token (web and iOS)
+      description: |
+        Verifies the ID token against the web and iOS OAuth client IDs. A new email creates a verified
+        account. An existing account with the same email is linked to Google and becomes verified; if that
+        account was unverified, its password and sessions are removed, since whoever registered it may not
+        own the email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken:
+                  type: string
+                  description: The ID token from Google Sign-In.
+      responses:
+        '200':
+          description: Signed in
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400':
+          description: idToken missing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: idToken is required }
+        '401':
+          description: Invalid or expired Google token, or the Google email is not verified
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                invalid: { value: { error: Invalid or expired Google token } }
+                unverified: { value: { error: Google account email is not verified } }
+        '409':
+          description: The email belongs to an account linked to a different Google account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: This email is linked to a different Google account }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshSession
+      security: []
+      summary: Trade a refresh token for a new session
+      description: The refresh token is used up; keep the new one from the response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: A new access token and refresh token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401':
+          description: Unknown, used, or expired refresh token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Invalid or expired refresh token }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke a refresh token
+      description: |
+        The refresh token is the proof, so the access token is optional: an app that has been idle past
+        15 minutes can still log out. Answers 204 even if the token was already revoked.
+      security:
+        - {}
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '204':
+          description: Logged out
+        '400':
+          description: refreshToken missing
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: refreshToken is required }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      security: []
+      summary: Email a password reset link
+      description: |
+        Always answers the same 200. If a password account exists and no reset link was sent in the last
+        hour, emails `${APP_URL}/reset-password?token=<token>`, valid for 1 hour. Limited to 5 requests per
+        15 minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Same answer for every email
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+              example: { message: 'If that email has a password account, a reset link is on its way' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      security: []
+      summary: Set a new password with a reset token
+      description: |
+        A token works once. Success signs the account out everywhere (every refresh token is revoked) and
+        ends any other reset links.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password:
+                  type: string
+                  minLength: 8
+                  description: Same rules as register.
+      responses:
+        '200':
+          description: Password updated; sign in again
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+              example: { message: 'Password updated, sign in again' }
+        '400':
+          description: Invalid new password, or an unknown, used, or expired token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                password: { value: { error: Password must be at least 8 characters } }
+                token: { value: { error: This link is invalid or has expired } }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Change the password while signed in
+      description: |
+        Ends every session (all refresh tokens are revoked) and returns a fresh one, so only the calling
+        client stays signed in.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword:
+                  type: string
+                  minLength: 8
+                  description: Same rules as register.
+      responses:
+        '200':
+          description: Password changed; a new session for this client
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400':
+          description: currentPassword missing or newPassword invalid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Password must be at least 8 characters }
+        '401':
+          description: No or invalid access token, or wrong current password (Google-only accounts have none)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                token: { value: { error: Invalid or expired token } }
+                password: { value: { error: Current password is incorrect } }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /users/me:
+    get:
+      tags: [Users]
+      operationId: getMe
+      summary: The signed-in user's profile and stats
+      description: Stats are private; no endpoint shows another user's.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Users]
+      operationId: updateMe
+      summary: Update display name or avatar
+      description: Send either or both fields. Other fields are ignored.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  description: Trimmed.
+                avatarId:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  description: Trimmed. Any id until the preset icon list exists.
+            example: { displayName: Night Owl, avatarId: owl }
+      responses:
+        '200':
+          description: The updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '400':
+          description: Invalid display name or avatar id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                displayName: { value: { error: Display name must be 1 to 32 characters } }
+                avatarId: { value: { error: Avatar id must be 1 to 32 characters } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me/games:
+    get:
+      tags: [Users]
+      operationId: getMyGames
+      summary: The signed-in user's game history, newest first
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000000, default: 1 }
+        - name: limit
+          in: query
+          description: Values above 50 are capped at 50.
+          schema: { type: integer, minimum: 1, default: 20 }
+      responses:
+        '200':
+          description: One page of history
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HistoryPage' }
+        '400':
+          description: page or limit is not a positive integer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: page and limit must be positive integers }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /games/{id}:
+    get:
+      tags: [Games]
+      operationId: getGame
+      summary: One finished game, for a player who played in it
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: 6740f0c2a1b2c3d4e5f60718 }
+      responses:
+        '200':
+          description: The game and every seat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameDetails' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No such game, or the user didn't play in it (the same answer, so ids can't be probed)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Game not found }
+
+  /rooms:
+    post:
+      tags: [Rooms]
+      operationId: createRoom
+      summary: Create a room (verified host)
+      description: |
+        Returns a 4-letter code that is unique among live rooms. A host has one live room at a time:
+        creating a new one closes the old one. The host screen then connects to Socket.io with its access
+        token to run the lobby.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                preset: { $ref: '#/components/schemas/Preset' }
+      responses:
+        '201':
+          description: Room created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, preset]
+                properties:
+                  code: { $ref: '#/components/schemas/RoomCode' }
+                  preset: { $ref: '#/components/schemas/Preset' }
+        '400':
+          description: Unknown preset
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: 'preset must be one of quick, normal, relaxed' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: The email is not verified yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Verify your email to host a game }
+
+  /rooms/{code}:
+    get:
+      tags: [Rooms]
+      operationId: checkRoom
+      security: []
+      summary: Check a room code before joining
+      description: No sign-in needed. Codes are matched case-insensitively.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string, minLength: 4, maxLength: 4, example: ABCD }
+      responses:
+        '200':
+          description: The room exists
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, status]
+                properties:
+                  code: { $ref: '#/components/schemas/RoomCode' }
+                  status:
+                    type: string
+                    enum: [open, started, full]
+                    description: |
+                      `open` can be joined; `started` only lets existing seats rejoin; `full` has 8 players.
+        '404':
+          description: No live room with that code (never created, or the game ended)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Room not found }
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: health
+      security: []
+      summary: Deploy health check (planned)
+      description: |
+        **Not built yet.** Planned for the deploy pipeline (PRD, CI/CD): the deploy script calls it after a
+        release and rolls back if it fails. Until it lands, this path answers 404.
+      responses:
+        '200':
+          description: The API is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+        '404':
+          description: Until the endpoint is built
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Not found }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from register, login, Google sign-in, refresh, or change-password. Expires after 15 minutes.
+
+  responses:
+    Unauthorized:
+      description: No access token, or it is invalid or expired; or the account no longer exists
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            missing: { value: { error: Sign in required } }
+            invalid: { value: { error: Invalid or expired token } }
+            gone: { value: { error: Account not found } }
+    TooManyRequests:
+      description: Rate limit reached for this IP and route
+      headers:
+        RateLimit:
+          schema: { type: string }
+          description: Remaining requests and reset time (IETF draft-8).
+        RateLimit-Policy:
+          schema: { type: string }
+          description: The limit and window (IETF draft-8).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: 'Too many attempts, try again later' }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Human-readable message.
+
+    Message:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    Session:
+      type: object
+      required: [accessToken, refreshToken, user]
+      properties:
+        accessToken:
+          type: string
+          description: 'JWT, valid for 15 minutes. Send as `Authorization: Bearer <accessToken>`.'
+        refreshToken:
+          type: string
+          description: Opaque, valid for 30 days, works once at `POST /auth/refresh`. Store it securely.
+        user: { $ref: '#/components/schemas/SessionUser' }
+
+    SessionUser:
+      type: object
+      required: [id, email, displayName, emailVerified]
+      properties:
+        id: { type: string, example: 6740f0c2a1b2c3d4e5f60718 }
+        email: { type: string, format: email, example: ana@example.com }
+        displayName: { type: string, example: Ana }
+        emailVerified: { type: boolean, example: false }
+
+    Profile:
+      type: object
+      required: [id, email, displayName, avatarId, emailVerified, signInMethods, stats, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        avatarId:
+          type: string
+          nullable: true
+        emailVerified: { type: boolean }
+        signInMethods:
+          type: array
+          items:
+            type: string
+            enum: [password, google]
+        stats: { $ref: '#/components/schemas/Stats' }
+        createdAt: { type: string, format: date-time }
+
+    Stats:
+      type: object
+      required: [gamesPlayed, villagerWins, monsterWins]
+      properties:
+        gamesPlayed: { type: integer, minimum: 0 }
+        villagerWins: { type: integer, minimum: 0 }
+        monsterWins:
+          type: object
+          required: [vampire, witch, werewolf]
+          properties:
+            vampire: { type: integer, minimum: 0 }
+            witch: { type: integer, minimum: 0 }
+            werewolf: { type: integer, minimum: 0 }
+
+    Preset:
+      type: string
+      enum: [quick, normal, relaxed]
+      default: normal
+      description: Timer preset. Quick is 0.67x and Relaxed 1.5x the Normal timers.
+
+    RoomCode:
+      type: string
+      pattern: '^[A-Z]{4}$'
+      example: ABCD
+
+    MonsterType:
+      type: string
+      enum: [vampire, witch, werewolf]
+
+    Winner:
+      type: string
+      enum: [villagers, monster]
+
+    Role:
+      type: string
+      enum: [villager, monster]
+
+    Outcome:
+      type: string
+      enum: [won, lost]
+
+    HistoryPage:
+      type: object
+      required: [page, limit, total, games]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+          description: The limit actually used (capped at 50).
+        total:
+          type: integer
+          minimum: 0
+          description: All of the user's games, across pages.
+        games:
+          type: array
+          items: { $ref: '#/components/schemas/HistoryGame' }
+
+    HistoryGame:
+      type: object
+      required: [id, startedAt, endedAt, playerCount, players, monsterType, winner, role, outcome]
+      properties:
+        id: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        playerCount: { type: integer, minimum: 4, maximum: 8 }
+        players:
+          type: array
+          description: Every player's display name, in seat order.
+          items: { type: string }
+        monsterType: { $ref: '#/components/schemas/MonsterType' }
+        winner: { $ref: '#/components/schemas/Winner' }
+        role:
+          allOf: [{ $ref: '#/components/schemas/Role' }]
+          description: The signed-in user's role in this game.
+        outcome:
+          allOf: [{ $ref: '#/components/schemas/Outcome' }]
+          description: Whether the signed-in user won.
+
+    GameDetails:
+      type: object
+      required: [id, roomCode, preset, startedAt, endedAt, playerCount, monsterType, winner, endReason, rounds, players]
+      properties:
+        id: { type: string }
+        roomCode: { $ref: '#/components/schemas/RoomCode' }
+        preset: { $ref: '#/components/schemas/Preset' }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        playerCount: { type: integer, minimum: 4, maximum: 8 }
+        monsterType: { $ref: '#/components/schemas/MonsterType' }
+        winner: { $ref: '#/components/schemas/Winner' }
+        endReason:
+          type: string
+          enum: [banished, outnumbered, forfeit]
+        rounds: { type: integer, minimum: 0 }
+        players:
+          type: array
+          description: Every seat, in seat order. Other players' account ids are never included.
+          items: { $ref: '#/components/schemas/GameSeat' }
+
+    GameSeat:
+      type: object
+      required: [id, displayName, costume, role, outcome, diedRound, nightHunches, isYou]
+      properties:
+        id:
+          type: string
+          description: This seat's id within the game; `nightHunches` point at these.
+        displayName: { type: string }
+        costume:
+          type: object
+          required: [hat, mask, item]
+          properties:
+            hat: { type: string, example: hat1 }
+            mask: { type: string, example: mask3 }
+            item: { type: string, example: item2 }
+        role: { $ref: '#/components/schemas/Role' }
+        outcome: { $ref: '#/components/schemas/Outcome' }
+        diedRound:
+          type: integer
+          nullable: true
+          description: The round the player was killed, banished, or removed in; null if they survived.
+        nightHunches:
+          type: array
+          description: Seat ids this player suspected at night, in round order.
+          items: { type: string }
+        isYou:
+          type: boolean
+          description: True for the signed-in user's seat.

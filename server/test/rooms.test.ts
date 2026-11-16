@@ -87,7 +87,7 @@ describe('GET /api/rooms/:code', () => {
   it('reports full and started rooms', async () => {
     const code = await newRoom()
     const room = getRoom(code)!
-    room.seats = Array.from({ length: MAX_PLAYERS }, (_, i) => ({ displayName: `P${i}` }))
+    room.seats = Array.from({ length: MAX_PLAYERS }, (_, i) => ({ seatId: `s${i}`, displayName: `P${i}`, connected: true }))
     expect((await request(app).get(`/api/rooms/${code}`)).body.status).toBe('full')
 
     room.startedAt = new Date()

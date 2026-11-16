@@ -17,6 +17,7 @@
 //   let phaseStart = try PhaseStart(json)
 //   let roomState = try RoomState(json)
 //   let voteReveal = try VoteReveal(json)
+//   let youJoined = try YouJoined(json)
 //   let youRejoined = try YouRejoined(json)
 //   let youResult = try YouResult(json)
 //   let youRole = try YouRole(json)
@@ -903,6 +904,68 @@ public extension Vote {
         return Vote(
             targetID: targetID ?? self.targetID,
             voterID: voterID ?? self.voterID
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+//
+// Hashable or Equatable:
+// The compiler will not be able to synthesize the implementation of Hashable or Equatable
+// for types that require the use of JSONAny, nor will the implementation of Hashable be
+// synthesized for types that have collections (such as arrays or dictionaries).
+
+/// Server to one, event `you:joined`. Sent when a phone takes a seat. The phone keeps the
+/// rejoin token and sends it in `room:join` to get the same seat back after a drop.
+// MARK: - YouJoined
+public struct YouJoined: Codable, Equatable {
+    /// Signed token for this room and seat. Store it on the device; never show it.
+    public let rejoinToken: String
+    public let seatID: String
+
+    public enum CodingKeys: String, CodingKey {
+        case rejoinToken
+        case seatID = "seatId"
+    }
+
+    public init(rejoinToken: String, seatID: String) {
+        self.rejoinToken = rejoinToken
+        self.seatID = seatID
+    }
+}
+
+// MARK: YouJoined convenience initializers and mutators
+
+public extension YouJoined {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(YouJoined.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        rejoinToken: String? = nil,
+        seatID: String? = nil
+    ) -> YouJoined {
+        return YouJoined(
+            rejoinToken: rejoinToken ?? self.rejoinToken,
+            seatID: seatID ?? self.seatID
         )
     }
 
