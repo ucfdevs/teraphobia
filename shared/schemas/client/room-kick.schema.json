@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RoomKick",
+  "description": "Client to server, event `room:kick`. Host only, before Start. Removes a player from the lobby.",
+  "type": "object",
+  "properties": {
+    "seatId": { "$ref": "../common.schema.json#/definitions/SeatId" }
+  },
+  "required": ["seatId"],
+  "additionalProperties": false
+}

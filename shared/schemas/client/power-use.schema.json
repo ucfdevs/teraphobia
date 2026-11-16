@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PowerUse",
+  "description": "Client to server, event `power:use`. Monster only, once per game, during Day. Vampire blocks the target's action; Witch plants a fake clue in the target's Search. The Werewolf's double kill goes through `night:submit` instead.",
+  "type": "object",
+  "properties": {
+    "targetId": { "$ref": "../common.schema.json#/definitions/SeatId" }
+  },
+  "required": ["targetId"],
+  "additionalProperties": false
+}

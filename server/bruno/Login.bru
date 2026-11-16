@@ -17,10 +17,16 @@ body:json {
   }
 }
 
+script:post-response {
+  bru.setEnvVar("accessToken", res.getBody().accessToken);
+  bru.setEnvVar("refreshToken", res.getBody().refreshToken);
+}
+
 tests {
   test("signs in the account from Register", function () {
     expect(res.getStatus()).to.equal(200);
     expect(res.getBody().accessToken).to.be.a("string");
+    expect(res.getBody().refreshToken).to.be.a("string");
     expect(res.getBody().user.email).to.equal(bru.getEnvVar("email"));
   });
 }

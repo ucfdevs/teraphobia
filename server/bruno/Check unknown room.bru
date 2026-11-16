@@ -1,0 +1,17 @@
+meta {
+  name: Check unknown room
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/rooms/zzzz
+  body: none
+  auth: none
+}
+
+tests {
+  test("an unknown code is not found", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

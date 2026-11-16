@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "YouRejoined",
+  "description": "Server to one, event `you:rejoined`. Everything this player already knows, sent after they reconnect to their seat. Contains nothing they weren't sent before.",
+  "type": "object",
+  "properties": {
+    "room": { "$ref": "room-state.schema.json" },
+    "phase": {
+      "description": "Current phase and timer. Null while the room is still in the lobby.",
+      "anyOf": [
+        { "$ref": "phase-start.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "you": {
+      "description": "This player's role and costume. Null while the room is still in the lobby.",
+      "anyOf": [
+        { "$ref": "you-role.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "results": {
+      "description": "Every private Day result this player has received, oldest first.",
+      "type": "array",
+      "items": { "$ref": "you-result.schema.json" }
+    },
+    "lastCandleTargetId": {
+      "description": "Who this player lit a candle for last Day, so the phone can grey them out tonight. Null if none.",
+      "$ref": "../common.schema.json#/definitions/NullableSeatId"
+    },
+    "powerUsed": {
+      "description": "Monster only. True once the Monster's power is spent, so the button stays hidden.",
+      "type": "boolean"
+    }
+  },
+  "required": ["room", "phase", "you", "results", "lastCandleTargetId"],
+  "additionalProperties": false
+}

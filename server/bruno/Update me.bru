@@ -1,0 +1,30 @@
+meta {
+  name: Update me
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/users/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "displayName": "Bruno Renamed",
+    "avatarId": "bat"
+  }
+}
+
+tests {
+  test("saves the new name and avatar", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().displayName).to.equal("Bruno Renamed");
+    expect(res.getBody().avatarId).to.equal("bat");
+  });
+}

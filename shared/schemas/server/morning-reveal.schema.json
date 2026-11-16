@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MorningReveal",
+  "description": "Server to all, event `morning:reveal`. Who died last night. An empty list means \"Everyone survived the night\". All deaths look the same.",
+  "type": "object",
+  "properties": {
+    "round": { "$ref": "../common.schema.json#/definitions/Round" },
+    "deadIds": {
+      "description": "Empty, one victim, or two after a Werewolf double kill.",
+      "type": "array",
+      "items": { "$ref": "../common.schema.json#/definitions/SeatId" },
+      "maxItems": 2,
+      "uniqueItems": true
+    }
+  },
+  "required": ["round", "deadIds"],
+  "additionalProperties": false
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VoteSubmit",
+  "description": "Client to server, event `vote:submit`. A living player votes to banish a player, or sends null to Skip. A missed vote counts as Skip.",
+  "type": "object",
+  "properties": {
+    "targetId": {
+      "description": "Seat to banish, or null for Skip.",
+      "anyOf": [
+        { "$ref": "../common.schema.json#/definitions/SeatId" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "required": ["targetId"],
+  "additionalProperties": false
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PhaseStart",
+  "description": "Server to all, event `phase:start`. Identical for every player, so a phone screen gives nothing away. Clients compare serverNow to their own clock and shift endsAt by the difference, so countdowns stay within 1 second.",
+  "type": "object",
+  "properties": {
+    "phase": { "$ref": "../common.schema.json#/definitions/Phase" },
+    "round": { "$ref": "../common.schema.json#/definitions/Round" },
+    "endsAt": {
+      "description": "When the phase ends, in server time.",
+      "$ref": "../common.schema.json#/definitions/EpochMs"
+    },
+    "serverNow": {
+      "description": "Server time when the event was sent. Clients use it to correct their own clock.",
+      "$ref": "../common.schema.json#/definitions/EpochMs"
+    }
+  },
+  "required": ["phase", "round", "endsAt", "serverNow"],
+  "additionalProperties": false
+}
