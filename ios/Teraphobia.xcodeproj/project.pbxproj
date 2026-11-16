@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2E5F1A6B7C8D9E0F1A2B3C4D /* SocketEvents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F6A2B7C8D9E0F1A2B3C4D5E /* SocketEvents.swift */; };
 		4A7B3C8D9E0F1A2B3C4D5E6F /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = 5B8C4D9E0F1A2B3C4D5E6F7A /* SocketIO */; };
+		7D0E6F1A2B3C4D5E6F7A8B9C /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 8E1F7A2B3C4D5E6F7A8B9C0D /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +47,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A7B3C8D9E0F1A2B3C4D5E6F /* SocketIO in Frameworks */,
+				7D0E6F1A2B3C4D5E6F7A8B9C /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,6 +101,7 @@
 			name = Teraphobia;
 			packageProductDependencies = (
 				5B8C4D9E0F1A2B3C4D5E6F7A /* SocketIO */,
+				8E1F7A2B3C4D5E6F7A8B9C0D /* GoogleSignIn */,
 			);
 			productName = Teraphobia;
 			productReference = 69B327EED614F416AF81AEB8 /* Teraphobia.app */;
@@ -157,6 +160,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				6C9D5E0F1A2B3C4D5E6F7A8B /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+				9F2A8B3C4D5E6F7A8B9C0D1E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8677DD501C1E53C71E4C0242 /* Products */;
@@ -339,6 +343,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -366,6 +371,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -465,6 +471,14 @@
 				minimumVersion = 16.1.1;
 			};
 		};
+		9F2A8B3C4D5E6F7A8B9C0D1E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 10.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -472,6 +486,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 6C9D5E0F1A2B3C4D5E6F7A8B /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
 			productName = SocketIO;
+		};
+		8E1F7A2B3C4D5E6F7A8B9C0D /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F2A8B3C4D5E6F7A8B9C0D1E /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
