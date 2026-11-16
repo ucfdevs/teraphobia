@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Navigate, Routes, Route, useNavigate } from 'react-router-dom';
 import './App.css';
 import logo from './assets/logo.svg';
 import LoginForm from './components/LoginForm';
@@ -27,11 +27,24 @@ interface UserProfile {
   emailVerified: boolean;
 }
 
+const ACCESS_TOKEN_KEY = 'teraphobia_access_token';
+const REFRESH_TOKEN_KEY = 'teraphobia_refresh_token';
+
+function getStoredSession(): Session | null {
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!accessToken) return null;
+  return {
+    accessToken,
+    refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) ?? '',
+    issuedAt: Date.now(),
+  };
+}
+
 export default function App() {
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(() => getStoredSession());
 
   // Auth form states
   const [name, setName] = useState('');
@@ -49,6 +62,19 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roomFilter, setRoomFilter] = useState('All');
 
+  const persistSession = (nextSession: Session | null) => {
+    setSession(nextSession);
+    if (nextSession?.accessToken) {
+      localStorage.setItem(ACCESS_TOKEN_KEY, nextSession.accessToken);
+      if (nextSession.refreshToken) {
+        localStorage.setItem(REFRESH_TOKEN_KEY, nextSession.refreshToken);
+      }
+    } else {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  };
+
   const resetForm = () => {
     setName('');
     setEmail('');
@@ -59,10 +85,10 @@ export default function App() {
 
   const handleSignInNav = () => {
     resetForm();
-    if (currentUser) {
+    if (currentUser || session) {
       navigate('/app');
     } else {
-      navigate('/login');
+      navigate('/signin');
     }
   };
 
@@ -73,7 +99,7 @@ export default function App() {
       navigate('/app');
     } else {
       resetForm();
-      navigate('/login');
+      navigate('/signin');
     }
   };
 
@@ -100,7 +126,7 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
-      setSession({
+      persistSession({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
         issuedAt: Date.now(),
@@ -139,7 +165,7 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
-      setSession({
+      persistSession({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
         issuedAt: Date.now(),
@@ -158,10 +184,18 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setSession(null);
+    persistSession(null);
     setResendMsg('');
     resetForm();
     navigate('/');
+  };
+
+  const handleUnauthorized = () => {
+    setCurrentUser(null);
+    persistSession(null);
+    setResendMsg('');
+    resetForm();
+    navigate('/signin');
   };
 
   const goHome = () => {
@@ -174,7 +208,7 @@ export default function App() {
       navigate('/app');
     } else {
       resetForm();
-      navigate('/login');
+      navigate('/signin');
     }
   };
 
@@ -231,6 +265,42 @@ export default function App() {
     </div>
   );
 
+  const renderLoginView = () => (
+    <div className="app-wrapper">
+      {renderFog()}
+      {renderHeader()}
+      <div className="auth-card">
+        <h2 className="card-title">Sign In</h2>
+
+        {errorMsg && <div className="alert-error">{errorMsg}</div>}
+        {successMsg && <div className="alert-success">{successMsg}</div>}
+
+        <LoginForm
+          email={email}
+          password={password}
+          loading={loading}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onSubmit={handleLogin}
+        />
+
+        <div className="card-footer">
+          Need an account?
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              navigate('/register');
+            }}
+            className="btn-link"
+          >
+            Register here
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Routes>
       {/* LANDING VIEW */}
@@ -241,7 +311,7 @@ export default function App() {
             {renderFog()}
             {renderHeader()}
             <LandingPage
-              isAuthenticated={!!currentUser}
+              isAuthenticated={!!(currentUser || session)}
               onHostGame={handleHostGame}
               onSignIn={handleSignInNav}
             />
@@ -249,45 +319,9 @@ export default function App() {
         }
       />
 
-      {/* LOGIN VIEW */}
-      <Route
-        path="/login"
-        element={
-          <div className="app-wrapper">
-            {renderFog()}
-            {renderHeader()}
-            <div className="auth-card">
-              <h2 className="card-title">Sign In</h2>
-
-              {errorMsg && <div className="alert-error">{errorMsg}</div>}
-              {successMsg && <div className="alert-success">{successMsg}</div>}
-
-              <LoginForm
-                email={email}
-                password={password}
-                loading={loading}
-                onEmailChange={setEmail}
-                onPasswordChange={setPassword}
-                onSubmit={handleLogin}
-              />
-
-              <div className="card-footer">
-                Need an account?
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetForm();
-                    navigate('/register');
-                  }}
-                  className="btn-link"
-                >
-                  Register here
-                </button>
-              </div>
-            </div>
-          </div>
-        }
-      />
+      {/* LOGIN & SIGNIN VIEWS */}
+      <Route path="/login" element={renderLoginView()} />
+      <Route path="/signin" element={renderLoginView()} />
 
       {/* VERIFY EMAIL VIEW */}
       <Route
@@ -330,7 +364,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     resetForm();
-                    navigate('/login');
+                    navigate('/signin');
                   }}
                   className="btn-link"
                 >
@@ -352,7 +386,7 @@ export default function App() {
               {renderHeader()}
               <HostScreen
                 session={session}
-                onSessionChange={setSession}
+                onSessionChange={persistSession}
                 onExit={() => navigate('/app')}
               />
             </div>
@@ -378,9 +412,18 @@ export default function App() {
                     </h2>
                     <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{currentUser.email}</p>
                   </div>
-                  <button onClick={handleLogout} className="btn-secondary">
-                    Sign Out
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/profile')}
+                      className="btn-secondary"
+                    >
+                      Profile &amp; Stats
+                    </button>
+                    <button type="button" onClick={handleLogout} className="btn-secondary">
+                      Sign Out
+                    </button>
+                  </div>
                 </div>
 
                 {currentUser.emailVerified && session && (
@@ -394,7 +437,7 @@ export default function App() {
                   </button>
                 )}
 
-                {!currentUser.emailVerified && (
+                {!currentUser.emailVerified && session && (
                   <div className="alert-error" role="alert">
                     Verify your email to host games. Check your inbox for the link.{' '}
                     <button
@@ -403,7 +446,7 @@ export default function App() {
                       disabled={resending}
                       className="btn-link"
                     >
-                      {resending ? 'Sending...' : 'Resend link'}
+                      {resending ? 'Sending…' : 'Resend link'}
                     </button>
                     {resendMsg && <div role="status">{resendMsg}</div>}
                   </div>
@@ -466,16 +509,42 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <NotFoundPage />
+            <Navigate replace to="/signin" />
+          )
+        }
+      />
+
+      {/* ISSUE #16 PROFILE & STATS ROUTE */}
+      <Route
+        path="/profile"
+        element={
+          session?.accessToken ? (
+            <div className="app-wrapper">
+              {renderFog()}
+              {renderHeader()}
+              <ProfilePage
+                accessToken={session.accessToken}
+                onBack={() => (currentUser ? navigate('/app') : navigate('/'))}
+                onProfileUpdated={(newName) =>
+                  setCurrentUser((prev) => (prev ? { ...prev, displayName: newName } : prev))
+                }
+                onTokenRotated={(newToken) =>
+                  persistSession({
+                    accessToken: newToken,
+                    refreshToken: session.refreshToken,
+                    issuedAt: Date.now(),
+                  })
+                }
+                onUnauthorized={handleUnauthorized}
+              />
+            </div>
+          ) : (
+            <Navigate replace to="/signin" />
           )
         }
       />
 
       {/* ISSUE #11 REQUIRED ROUTES */}
-      <Route
-        path="/profile"
-        element={<ProfilePage username={currentUser?.displayName} email={currentUser?.email} />}
-      />
       <Route path="/rooms/new" element={<CreateRoomPage />} />
       <Route path="/lobby" element={<LobbyPlaceholderPage />} />
       <Route path="*" element={<NotFoundPage />} />
