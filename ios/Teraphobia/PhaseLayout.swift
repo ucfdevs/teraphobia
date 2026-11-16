@@ -60,7 +60,7 @@ struct PlayerPicker: View {
 // Sample players for the Night and Day previews.
 extension PublicSeat {
     static let previews = ["Gui", "Cameron", "Lili", "Bernardo", "Teresa"].enumerated().map { index, name in
-        PublicSeat(connected: true, costume: Costume(hat: "hat1", item: "item1", mask: "mask1"),
+        PublicSeat(connected: true, costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask),
                    displayName: name, lifeStatus: .alive, seatID: "seat\(index)")
     }
 }

@@ -8,11 +8,12 @@ export type Slot = (typeof SLOTS)[number]
 export type Costume = Record<Slot, string>
 export type MonsterType = 'vampire' | 'witch' | 'werewolf'
 
-export const OPTIONS_PER_SLOT = 4
-// Option ids until the costume art names them: hat1..hat4, mask1..mask4, item1..item4.
-export const OPTIONS: Record<Slot, string[]> = Object.fromEntries(
-  SLOTS.map((slot) => [slot, Array.from({ length: OPTIONS_PER_SLOT }, (_, i) => `${slot}${i + 1}`)]),
-) as Record<Slot, string[]>
+// Ids match the sprite names in web/public/sprites and shared/schemas/common.schema.json (#78).
+export const OPTIONS: Record<Slot, string[]> = {
+  hat: ['top-hat', 'jester-cap', 'crown', 'horned-helmet'],
+  mask: ['domino-mask', 'beak-mask', 'pumpkin-mask', 'skull-mask'],
+  item: ['lantern', 'pitchfork', 'umbrella', 'raven'],
+}
 
 export const WEREWOLF_MIN_PLAYERS = 6
 

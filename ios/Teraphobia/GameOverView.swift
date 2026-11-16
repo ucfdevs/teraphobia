@@ -37,6 +37,6 @@ struct GameOverView: View {
 
 #Preview {
     GameOverView(gameOver: GameOver(endReason: .banished, hunches: [], monster: Monster(monsterType: .vampire, seatID: "seat1"), rounds: 3, winner: .villagers),
-                 you: YouRole(costume: Costume(hat: "hat1", item: "item1", mask: "mask1"), monsterType: nil, role: .villager, seatID: "seat0"),
+                 you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: nil, role: .villager, seatID: "seat0"),
                  seats: PublicSeat.previews, done: {})
 }

@@ -836,9 +836,9 @@ components:
           type: object
           required: [hat, mask, item]
           properties:
-            hat: { type: string, example: hat1 }
-            mask: { type: string, example: mask3 }
-            item: { type: string, example: item2 }
+            hat: { type: string, example: top-hat }
+            mask: { type: string, example: pumpkin-mask }
+            item: { type: string, example: pitchfork }
         role: { $ref: '#/components/schemas/Role' }
         outcome: { $ref: '#/components/schemas/Outcome' }
         diedRound:

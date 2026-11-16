@@ -38,7 +38,7 @@ struct VoteView: View {
 
 #Preview {
     NavigationStack {
-        VoteView(you: YouRole(costume: Costume(hat: "hat1", item: "item1", mask: "mask1"), monsterType: nil, role: .villager, seatID: "seat0"),
+        VoteView(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: nil, role: .villager, seatID: "seat0"),
                  seats: PublicSeat.previews, deadline: .now.addingTimeInterval(30), lockedIn: false, votedTargetID: nil, vote: { _ in })
     }
 }
