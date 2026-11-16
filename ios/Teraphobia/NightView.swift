@@ -49,7 +49,7 @@ struct NightView: View {
 
 #Preview {
     NavigationStack {
-        NightView(you: YouRole(costume: Costume(hat: "hat1", item: "item1", mask: "mask1"), monsterType: nil, role: .villager, seatID: "seat0"),
+        NightView(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: nil, role: .villager, seatID: "seat0"),
                   seats: PublicSeat.previews, round: 1, deadline: .now.addingTimeInterval(30), powerUsed: false, send: { _ in })
     }
 }

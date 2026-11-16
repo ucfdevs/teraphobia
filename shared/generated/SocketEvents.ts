@@ -253,9 +253,15 @@ export interface YouResult {
  * One costume trait, used in Search and Commune results.
  */
 export interface Trait {
-    option: string;
+    option: TraitOption;
     slot:   TraitSlot;
 }
+
+/**
+ * Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in
+ * web/public/sprites (#78).
+ */
+export type TraitOption = "top-hat" | "jester-cap" | "crown" | "horned-helmet" | "domino-mask" | "beak-mask" | "pumpkin-mask" | "skull-mask" | "lantern" | "pitchfork" | "umbrella" | "raven";
 
 export type TraitSlot = "hat" | "mask" | "item";
 
@@ -294,10 +300,16 @@ export interface PublicSeat {
  * Public costume: one option in each of the 3 slots.
  */
 export interface Costume {
-    hat:  string;
-    item: string;
-    mask: string;
+    hat:  HatOption;
+    item: ItemOption;
+    mask: MaskOption;
 }
+
+export type HatOption = "top-hat" | "jester-cap" | "crown" | "horned-helmet";
+
+export type ItemOption = "lantern" | "pitchfork" | "umbrella" | "raven";
+
+export type MaskOption = "domino-mask" | "beak-mask" | "pumpkin-mask" | "skull-mask";
 
 /**
  * Public status. A player removed for disconnecting 2 rounds shows as dead.

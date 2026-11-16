@@ -28,9 +28,9 @@ describe('dealCostumes', () => {
   })
 
   it('isFairDeal catches duplicates and loners', () => {
-    const a = { hat: 'hat1', mask: 'mask1', item: 'item1' }
-    const b = { hat: 'hat1', mask: 'mask1', item: 'item2' }
-    const loner = { hat: 'hat4', mask: 'mask4', item: 'item4' }
+    const a = { hat: 'top-hat', mask: 'domino-mask', item: 'lantern' }
+    const b = { hat: 'top-hat', mask: 'domino-mask', item: 'pitchfork' }
+    const loner = { hat: 'horned-helmet', mask: 'skull-mask', item: 'raven' }
     expect(isFairDeal([a, b])).toBe(true)
     expect(isFairDeal([a, a])).toBe(false)
     expect(isFairDeal([a, b, loner])).toBe(false)

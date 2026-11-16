@@ -79,18 +79,33 @@
       "type": "string",
       "enum": ["hat", "mask", "item"]
     },
-    "TraitOption": {
-      "description": "Option id within a slot (4 per slot). Switch to enums once the costume art names are final.",
+    "HatOption": {
       "type": "string",
-      "minLength": 1
+      "enum": ["top-hat", "jester-cap", "crown", "horned-helmet"]
+    },
+    "MaskOption": {
+      "type": "string",
+      "enum": ["domino-mask", "beak-mask", "pumpkin-mask", "skull-mask"]
+    },
+    "ItemOption": {
+      "type": "string",
+      "enum": ["lantern", "pitchfork", "umbrella", "raven"]
+    },
+    "TraitOption": {
+      "description": "Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in web/public/sprites (#78).",
+      "anyOf": [
+        { "$ref": "#/definitions/HatOption" },
+        { "$ref": "#/definitions/MaskOption" },
+        { "$ref": "#/definitions/ItemOption" }
+      ]
     },
     "Costume": {
       "description": "Public costume: one option in each of the 3 slots.",
       "type": "object",
       "properties": {
-        "hat": { "$ref": "#/definitions/TraitOption" },
-        "mask": { "$ref": "#/definitions/TraitOption" },
-        "item": { "$ref": "#/definitions/TraitOption" }
+        "hat": { "$ref": "#/definitions/HatOption" },
+        "mask": { "$ref": "#/definitions/MaskOption" },
+        "item": { "$ref": "#/definitions/ItemOption" }
       },
       "required": ["hat", "mask", "item"],
       "additionalProperties": false
