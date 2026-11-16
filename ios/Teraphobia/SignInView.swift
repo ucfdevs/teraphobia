@@ -31,29 +31,12 @@ struct SignInView: View {
     }
 
     var body: some View {
-        Form {
-            if let user = auth.user {
-                signedIn(user)
-            } else {
-                signInForm
-            }
-        }
-        .navigationTitle(auth.user == nil ? mode.rawValue : "Account")
-    }
-
-    @ViewBuilder
-    private func signedIn(_ user: AuthUser) -> some View {
-        Section {
-            LabeledContent("Name", value: user.displayName)
-            LabeledContent("Email", value: user.email)
-        } footer: {
-            if !user.emailVerified {
-                Text("Check your email for the link to verify your account.")
-            }
-        }
-
-        Button("Sign out", role: .destructive) {
-            Task { await auth.signOut() }
+        // Once signed in, this screen becomes the Profile (#40).
+        if auth.user != nil {
+            ProfileView(auth: auth)
+        } else {
+            Form { signInForm }
+                .navigationTitle(mode.rawValue)
         }
     }
 
