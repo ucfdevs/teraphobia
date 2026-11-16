@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import Teraphobia
 
@@ -26,5 +27,18 @@ struct JoinValidationTests {
     ])
     func joinIsEnabled(code: String, name: String) {
         #expect(JoinValidation.canJoin(code: code, name: name))
+    }
+
+    @Test func codeComesFromJoinLink() {
+        #expect(JoinValidation.code(from: URL(string: "https://teraphobia.com/join/abcd")!) == "ABCD")
+    }
+
+    @Test(arguments: [
+        "https://teraphobia.com/",
+        "https://teraphobia.com/join/AB",
+        "https://teraphobia.com/verify?token=x",
+    ])
+    func otherLinksGiveNoCode(link: String) {
+        #expect(JoinValidation.code(from: URL(string: link)!) == nil)
     }
 }

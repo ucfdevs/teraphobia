@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["NL5855QHYU.com.teraphobia"],
+        "components": [{ "/": "/join/*" }]
+      }
+    ]
+  }
+}
