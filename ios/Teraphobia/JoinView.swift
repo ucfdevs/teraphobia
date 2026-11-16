@@ -8,6 +8,7 @@ struct JoinView: View {
     @State private var roomCode = ""
     @State private var displayName = ""
     @State private var client = RoomClient()
+    @State private var auth = AuthClient()
     @FocusState private var focusedField: Field?
 
     var body: some View {
@@ -59,8 +60,8 @@ struct JoinView: View {
                         .foregroundStyle(.red)
                 }
 
-                NavigationLink("Sign in") {
-                    SignInView()
+                NavigationLink(auth.user.map { "Signed in as \($0.displayName)" } ?? "Sign in") {
+                    SignInView(auth: auth)
                 }
             }
             .navigationTitle("Teraphobia")
@@ -69,6 +70,8 @@ struct JoinView: View {
             }
         }
         .tint(.orange)
+        // On the NavigationStack, not the Form, so it runs once at launch and not every time a screen pops back.
+        .task { await auth.refresh() }
     }
 }
 

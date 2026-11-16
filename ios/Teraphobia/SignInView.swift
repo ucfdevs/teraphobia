@@ -1,14 +1,132 @@
 import SwiftUI
 
+// Sign in and Register (FR-1). Signing in is optional; it lets a player keep stats and history.
 struct SignInView: View {
+    private enum Mode: String, CaseIterable {
+        case signIn = "Sign in"
+        case register = "Register"
+    }
+
+    private enum Field {
+        case displayName, email, password
+    }
+
+    let auth: AuthClient
+
+    @State private var mode = Mode.signIn
+    @State private var displayName = ""
+    @State private var email = ""
+    @State private var password = ""
+    @FocusState private var focusedField: Field?
+
+    private var trimmedEmail: String {
+        email.trimmingCharacters(in: .whitespaces)
+    }
+
+    private var canSubmit: Bool {
+        switch mode {
+        case .signIn: AuthValidation.canSignIn(email: trimmedEmail, password: password)
+        case .register: AuthValidation.canRegister(email: trimmedEmail, password: password, name: displayName)
+        }
+    }
+
     var body: some View {
-        Text("Sign in is coming soon.")
-            .navigationTitle("Sign in")
+        Form {
+            if let user = auth.user {
+                signedIn(user)
+            } else {
+                signInForm
+            }
+        }
+        .navigationTitle(auth.user == nil ? mode.rawValue : "Account")
+    }
+
+    @ViewBuilder
+    private func signedIn(_ user: AuthUser) -> some View {
+        Section {
+            LabeledContent("Name", value: user.displayName)
+            LabeledContent("Email", value: user.email)
+        } footer: {
+            if !user.emailVerified {
+                Text("Check your email for the link to verify your account.")
+            }
+        }
+
+        Button("Sign out", role: .destructive) {
+            Task { await auth.signOut() }
+        }
+    }
+
+    @ViewBuilder
+    private var signInForm: some View {
+        Picker("Mode", selection: $mode) {
+            ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) }
+        }
+        .pickerStyle(.segmented)
+        .listRowBackground(Color.clear)
+        .onChange(of: mode) { auth.error = nil }
+
+        Section {
+            if mode == .register {
+                TextField("Display name", text: $displayName)
+                    .textContentType(.nickname)
+                    .focused($focusedField, equals: .displayName)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .email }
+                    .onChange(of: displayName) {
+                        displayName = String(displayName.prefix(AuthValidation.maxNameLength))
+                    }
+            }
+
+            TextField("Email", text: $email)
+                .textContentType(.emailAddress)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($focusedField, equals: .email)
+                .submitLabel(.next)
+                .onSubmit { focusedField = .password }
+
+            SecureField("Password", text: $password)
+                // .newPassword lets iOS suggest a strong password and save it to Passwords.
+                .textContentType(mode == .register ? .newPassword : .password)
+                .focused($focusedField, equals: .password)
+                .submitLabel(.go)
+                .onSubmit(submit)
+        } footer: {
+            // The password rule shows until it's met (FR-1).
+            if mode == .register, let problem = AuthValidation.passwordError(password) {
+                Text(problem)
+            }
+        }
+
+        Button(mode.rawValue, action: submit)
+            .disabled(!canSubmit || auth.isWorking)
+
+        if let error = auth.error {
+            Text(error)
+                .foregroundStyle(.red)
+        }
+    }
+
+    private func submit() {
+        guard canSubmit, !auth.isWorking else { return }
+        Task {
+            switch mode {
+            case .signIn:
+                await auth.signIn(email: trimmedEmail, password: password)
+            case .register:
+                await auth.register(email: trimmedEmail, password: password,
+                                    displayName: displayName.trimmingCharacters(in: .whitespaces))
+            }
+            // Cleared once signed in, so the password doesn't stay in memory.
+            if auth.user != nil { password = "" }
+        }
     }
 }
 
 #Preview {
     NavigationStack {
-        SignInView()
+        SignInView(auth: AuthClient())
     }
 }
