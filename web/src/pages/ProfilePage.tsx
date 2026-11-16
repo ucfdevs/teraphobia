@@ -39,6 +39,7 @@ interface ProfilePageProps {
     onBack: () => void;
     onProfileUpdated: (displayName: string) => void;
     onTokenRotated: (newAccessToken: string) => void;
+  onUnauthorized?: () => void;
 }
 
 const PRESET_AVATARS = [
@@ -56,6 +57,7 @@ export default function ProfilePage({
     onBack,
     onProfileUpdated,
     onTokenRotated,
+  onUnauthorized,
 }: ProfilePageProps) {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [displayName, setDisplayName] = useState('');
@@ -80,6 +82,10 @@ export default function ProfilePage({
     const [passwordErr, setPasswordErr] = useState('');
 
     useEffect(() => {
+    if (!accessToken) {
+      onUnauthorized?.();
+      return;
+    }
         let cancelled = false;
         async function loadProfile() {
             setLoadingProfile(true);
@@ -88,6 +94,10 @@ export default function ProfilePage({
                 const res = await fetch('/api/users/me', {
                     headers: { Authorization: `Bearer ${accessToken}` },
                 });
+      if (res.status === 401) {
+        if (!cancelled) onUnauthorized?.();
+        return;
+      }
                 const data = await res.json();
                 if (!res.ok) {
                     throw new Error(data.error || 'Failed to load profile.');
@@ -111,7 +121,7 @@ export default function ProfilePage({
         return () => {
             cancelled = true;
         };
-    }, [accessToken]);
+    }, [accessToken, onUnauthorized]);
 
     useEffect(() => {
         let cancelled = false;
@@ -224,9 +234,31 @@ export default function ProfilePage({
         <div className="dashboard-card">
             <div className="dash-header">
                 <div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc' }}>
-                        Profile &amp; Stats
-                    </h2>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div
+              aria-label="Avatar placeholder"
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "9999px",
+                backgroundColor: "#1e293b",
+                border: "1px solid #475569",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 700,
+                fontSize: "1.1rem",
+                color: "#f8fafc",
+              }}
+            >
+              {(profile?.displayName?.[0] || "?").toUpperCase()}
+            </div>
+            <div>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#f8fafc" }}>
+                {profile ? profile.displayName : "Profile & Stats"}
+              </h2>
+            </div>
+          </div>
                     {profile && (
                         <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.25rem' }}>
                             {profile.email} &bull;{' '}
@@ -332,7 +364,6 @@ export default function ProfilePage({
                                     maxLength={24}
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
-                                    required
                                 />
                             </div>
 
