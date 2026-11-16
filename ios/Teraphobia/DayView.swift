@@ -118,10 +118,21 @@ struct ResultView: View {
                 if you.role == .monster {
                     FlavorMessage()
                 } else {
-                    Text(text)
+                    HStack(spacing: 12) {
+                        if let clueTrait {
+                            TraitView(trait: clueTrait)
+                        }
+                        Text(text)
+                    }
                 }
             }
         }
+    }
+
+    // Only Search and Commune results carry a trait.
+    private var clueTrait: Trait? {
+        guard let result, result.round == round else { return nil }
+        return result.trait
     }
 
     private var text: String {

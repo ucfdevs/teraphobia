@@ -16,6 +16,15 @@ struct PhaseLayout<Content: View>: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
 
+            // Costumes are public, so everyone can see and talk about their own.
+            Section("Your costume") {
+                HStack(spacing: 12) {
+                    CostumeView(costume: you.costume, size: 64)
+                        .accessibilityHidden(true)
+                    Text(costumeName(you.costume).capitalized)
+                }
+            }
+
             content
         }
         .navigationTitle(title)
@@ -43,6 +52,9 @@ struct PlayerPicker: View {
                     onPick(seat.seatID)
                 } label: {
                     HStack {
+                        if let costume = seat.costume {
+                            CostumeView(costume: costume)
+                        }
                         Text(seat.displayName)
                             .foregroundStyle(.primary)
                         Spacer()
@@ -51,6 +63,7 @@ struct PlayerPicker: View {
                         }
                     }
                 }
+                .accessibilityLabel(seat.costume.map { "\(seat.displayName), \(costumeName($0))" } ?? seat.displayName)
                 .accessibilityAddTraits(picked.contains(seat.seatID) ? .isSelected : [])
             }
         }
