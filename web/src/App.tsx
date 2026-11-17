@@ -29,6 +29,7 @@ interface UserProfile {
 
 const ACCESS_TOKEN_KEY = 'teraphobia_access_token';
 const REFRESH_TOKEN_KEY = 'teraphobia_refresh_token';
+const USER_STORAGE_KEY = 'user';
 
 function getStoredSession(): Session | null {
   const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -43,7 +44,15 @@ function getStoredSession(): Session | null {
 export default function App() {
   const navigate = useNavigate();
 
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      const raw = localStorage.getItem(USER_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as UserProfile) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [session, setSession] = useState<Session | null>(() => getStoredSession());
 
   // Auth form states
@@ -62,16 +71,22 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roomFilter, setRoomFilter] = useState('All');
 
-  const persistSession = (nextSession: Session | null) => {
+  const persistSession = (nextSession: Session | null, nextUser?: UserProfile | null) => {
     setSession(nextSession);
     if (nextSession?.accessToken) {
       localStorage.setItem(ACCESS_TOKEN_KEY, nextSession.accessToken);
+      localStorage.setItem('accessToken', nextSession.accessToken);
       if (nextSession.refreshToken) {
         localStorage.setItem(REFRESH_TOKEN_KEY, nextSession.refreshToken);
       }
+      if (nextUser) {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(nextUser));
+      }
     } else {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem('accessToken');
       localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(USER_STORAGE_KEY);
     }
   };
 
@@ -103,10 +118,15 @@ export default function App() {
     }
   };
 
-  const handleRegister = async (e: FormEvent) => {
+  const handleRegister = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+
+    if (password.length < 8) {
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -119,6 +139,7 @@ export default function App() {
           password,
         }),
       });
+
       const data = await res.json();
 
       if (!res.ok) {
@@ -126,12 +147,15 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
-      persistSession({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        issuedAt: Date.now(),
-      });
-      navigate('/app');
+      persistSession(
+        {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          issuedAt: Date.now(),
+        },
+        data.user
+      );
+      navigate('/profile');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
@@ -165,12 +189,15 @@ export default function App() {
       }
 
       setCurrentUser(data.user);
-      persistSession({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        issuedAt: Date.now(),
-      });
-      navigate('/app');
+      persistSession(
+        {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          issuedAt: Date.now(),
+        },
+        data.user
+      );
+      navigate('/profile');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
@@ -272,7 +299,11 @@ export default function App() {
       <div className="auth-card">
         <h2 className="card-title">Sign In</h2>
 
-        {errorMsg && <div className="alert-error">{errorMsg}</div>}
+        {errorMsg && (
+          <div className="alert-error" role="alert">
+            {errorMsg}
+          </div>
+        )}
         {successMsg && <div className="alert-success">{successMsg}</div>}
 
         <LoginForm
@@ -285,7 +316,19 @@ export default function App() {
         />
 
         <div className="card-footer">
-          Need an account?
+          <div style={{ marginBottom: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                navigate('/forgot-password');
+              }}
+              className="btn-link"
+            >
+              Forgot password?
+            </button>
+          </div>
+          Need an account?{' '}
           <button
             type="button"
             onClick={() => {
@@ -323,6 +366,30 @@ export default function App() {
       <Route path="/login" element={renderLoginView()} />
       <Route path="/signin" element={renderLoginView()} />
 
+      {/* FORGOT PASSWORD VIEW */}
+      <Route
+        path="/forgot-password"
+        element={
+          <div className="app-wrapper">
+            {renderFog()}
+            {renderHeader()}
+            <div className="auth-card">
+              <h2 className="card-title">Reset Password</h2>
+              <p style={{ marginBottom: '1.25rem', opacity: 0.85 }}>
+                Password reset via email is coming soon. Please contact support or try signing in again.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate('/signin')}
+                className="btn-primary"
+              >
+                Back to Sign In
+              </button>
+            </div>
+          </div>
+        }
+      />
+
       {/* VERIFY EMAIL VIEW */}
       <Route
         path="/verify"
@@ -345,7 +412,11 @@ export default function App() {
             <div className="auth-card">
               <h2 className="card-title">Create Account</h2>
 
-              {errorMsg && <div className="alert-error">{errorMsg}</div>}
+              {errorMsg && (
+                <div className="alert-error" role="alert">
+                  {errorMsg}
+                </div>
+              )}
 
               <RegisterForm
                 name={name}
@@ -548,6 +619,6 @@ export default function App() {
       <Route path="/rooms/new" element={<CreateRoomPage />} />
       <Route path="/lobby" element={<LobbyPlaceholderPage />} />
       <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+    </Routes >
   );
 }
