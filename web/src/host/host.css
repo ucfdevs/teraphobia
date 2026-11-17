@@ -24,9 +24,13 @@
 .host-card {
   max-width: 640px;
   margin: 0 auto;
+  background:
+    radial-gradient(ellipse at 75% 12%, var(--color-surface-hover) 0%, transparent 35%),
+    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-elevated) 100%);
 }
 
 .host-title {
+  color: var(--color-text);
   font-family: var(--font-display);
   font-size: var(--text-3xl);
   line-height: var(--leading-tight);
@@ -105,7 +109,9 @@
   padding: var(--space-lg);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background:
+    radial-gradient(ellipse at 75% 12%, var(--color-surface-hover) 0%, transparent 50%),
+    var(--color-surface);
   cursor: pointer;
 }
 
@@ -180,16 +186,41 @@
 }
 
 .host-night {
-  background: linear-gradient(180deg, #050816 0%, var(--color-bg-elevated) 100%);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 75% 12%, var(--color-surface-hover) 0%, transparent 35%),
+    linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-elevated) 100%);
+}
+
+.host-night-scene {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 800px;
+  margin: var(--space-xl) auto;
 }
 
 .host-moon {
-  width: 120px;
-  height: 120px;
-  margin: var(--space-2xl) auto 0;
+  width: clamp(5rem, 12vw, 7.5rem);
+  aspect-ratio: 1;
+  margin: 0 0 -1rem;
   border-radius: 50%;
-  background: #f8fafc;
-  box-shadow: 0 0 60px 10px rgba(248, 250, 252, 0.25), inset -24px -8px 0 0 #cbd5e1;
+  background: var(--color-text);
+  box-shadow:
+    0 0 2.5rem var(--color-surface-hover),
+    inset -1.5rem -0.5rem 0 var(--color-border);
+}
+
+.host-manor {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.host-night>.host-lead {
+  max-width: 36ch;
+  margin-inline: auto;
+  text-align: center;
 }
 
 .host-seats {
@@ -209,7 +240,8 @@
 }
 
 .host-seat.is-out {
-  opacity: 0.55;
+  background: var(--color-bg-elevated);
+  border-style: dashed;
 }
 
 .host-seat-name {
@@ -277,6 +309,7 @@
 }
 
 @media (max-width: 640px) {
+
   .host-card,
   .host-stage {
     padding: var(--space-lg);
@@ -288,5 +321,51 @@
 
   .host-countdown {
     text-align: left;
+  }
+}
+
+.host-layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 1100px;
+}
+
+.host-brand-header {
+  align-items: center;
+  width: 100%;
+  margin: 0;
+}
+
+.host-brand-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.host-brand-button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}
+
+.host-brand-header .brand-logo {
+  width: clamp(7rem, 12vw, 10rem);
+  max-height: none;
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .host-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-md);
+  }
+
+  .host-brand-header .brand-logo {
+    width: clamp(6rem, 30vw, 8rem);
   }
 }

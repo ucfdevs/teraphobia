@@ -24,11 +24,17 @@ function nameOf(room: RoomState, seatId: string | null) {
 
 export function Countdown({ endsAt, clockOffsetMs }: { endsAt: number; clockOffsetMs: number }) {
   const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, []);
+    const updateNow = () => setNow(Date.now());
+
+    updateNow();
+    const timer = window.setInterval(updateNow, 250);
+    return () => window.clearInterval(timer);
+  }, [endsAt, clockOffsetMs]);
+
   const seconds = Math.max(0, Math.ceil((endsAt - (now + clockOffsetMs)) / 1000));
+
   return (
     <div className="host-countdown" role="timer" aria-live="off" aria-label={`${seconds} seconds left`}>
       {seconds}
@@ -124,7 +130,23 @@ export function NightScreen({ phase, clockOffsetMs }: { phase: PhaseStart; clock
   return (
     <section className="host-stage host-night" aria-labelledby="phase-title">
       <PhaseHeader title="Night falls on the manor" phase={phase} clockOffsetMs={clockOffsetMs} />
-      <div className="host-moon" aria-hidden="true" />
+
+      <div className="host-night-scene" aria-hidden="true">
+        <div className="host-moon" />
+        <svg
+          className="host-manor"
+          viewBox="0 0 640 180"
+          width="100%"
+          height="180"
+          preserveAspectRatio="xMidYMax meet"
+        >
+          <path
+            fill="var(--color-bg)"
+            d="M0 180V140H70V95L120 55L170 95V140H205V85L250 40L295 85V140H330V105L375 65L420 105V140H465V75L520 20L575 75V140H640V180Z"
+          />
+        </svg>
+      </div>
+
       <p className="host-lead">Everyone, look at your phone. The Monster is choosing a victim...</p>
     </section>
   );
@@ -136,14 +158,17 @@ export function MorningScreen({ room, phase, morning, clockOffsetMs }: {
   morning: MorningReveal | null;
   clockOffsetMs: number;
 }) {
-  const deadIds = morning && morning.round === phase.round ? morning.deadIds : [];
+  const deadIds = morning?.round === phase.round ? morning.deadIds : null;
+
   return (
     <section className="host-stage" aria-labelledby="phase-title">
       <PhaseHeader title="Morning" phase={phase} clockOffsetMs={clockOffsetMs} />
       <p className="host-reveal" role="status">
-        {deadIds.length === 0
-          ? 'Everyone survived the night'
-          : `${deadIds.map((id) => nameOf(room, id)).join(' and ')} did not survive the night`}
+        {deadIds === null
+          ? 'The sun is rising...'
+          : deadIds.length === 0
+            ? 'Everyone survived the night'
+            : `${deadIds.map((id) => nameOf(room, id)).join(' and ')} did not survive the night`}
       </p>
     </section>
   );
@@ -163,10 +188,18 @@ function CostumeSprite({ costume }: { costume: Costume }) {
 
 // Names stay as text (#30), so a trait is never told apart by the picture alone.
 function CostumeTraits({ costume }: { costume: Costume }) {
+  const traits = [
+    { slot: 'hat', label: 'Hat' },
+    { slot: 'mask', label: 'Mask' },
+    { slot: 'item', label: 'Item' },
+  ] as const;
+
   return (
     <ul className="host-traits">
-      {(['hat', 'mask', 'item'] as const).map((slot) => (
-        <li key={slot}>{costume[slot].replace('-', ' ')}</li>
+      {traits.map(({ slot, label }) => (
+        <li key={slot}>
+          <strong>{label}:</strong> {costume[slot].replace('-', ' ')}
+        </li>
       ))}
     </ul>
   );
@@ -174,15 +207,22 @@ function CostumeTraits({ costume }: { costume: Costume }) {
 
 function SeatCard({ seat }: { seat: PublicSeat }) {
   const out = seat.lifeStatus !== 'alive';
+  const statusLabel =
+    seat.lifeStatus === 'alive' ? 'Alive' : seat.lifeStatus === 'banished' ? 'Banished' : 'Dead';
+
   return (
     <li className={`host-seat${out ? ' is-out' : ''}`}>
       <p className="host-seat-name">
         {seat.displayName}
-        {out && <span className="host-badge">{seat.lifeStatus === 'banished' ? 'Banished' : 'Dead'}</span>}
+        <span className="host-badge">{statusLabel}</span>
         {!seat.connected && !out && <span className="host-muted"> (away)</span>}
       </p>
-      {seat.costume && <CostumeSprite costume={seat.costume} />}
-      {seat.costume && <CostumeTraits costume={seat.costume} />}
+      {seat.costume && (
+        <>
+          <CostumeSprite costume={seat.costume} />
+          <CostumeTraits costume={seat.costume} />
+        </>
+      )}
     </li>
   );
 }
@@ -193,7 +233,9 @@ export function DayScreen({ room, phase, clockOffsetMs }: { room: RoomState; pha
       <PhaseHeader title="Day" phase={phase} clockOffsetMs={clockOffsetMs} />
       <p className="host-lead">Villagers: Search, Commune, or light a Candle on your phone.</p>
       <ul className="host-seats">
-        {room.seats.map((seat) => <SeatCard key={seat.seatId} seat={seat} />)}
+        {room.seats.map((seat) => (
+          <SeatCard key={seat.seatId} seat={seat} />
+        ))}
       </ul>
     </section>
   );
