@@ -52,8 +52,8 @@ struct ProfileView: View {
             }
             .pickerStyle(.navigationLink)
 
-            LabeledContent("Name") {
-                TextField("Display name", text: $name)
+            LabeledContent("Username") {
+                TextField("Username", text: $name)
                     .multilineTextAlignment(.trailing)
                     .textContentType(.nickname)
                     .focused($nameFocused)
