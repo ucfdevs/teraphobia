@@ -149,16 +149,24 @@ export function MorningScreen({ room, phase, morning, clockOffsetMs }: {
   );
 }
 
-// Traits are told apart by shape and name, never by color alone.
-const TRAIT_SHAPES = { hat: '▲', mask: '●', item: '■' } as const;
+// Costumes use the #78 sprites in public/sprites. They all share one 128x128 canvas, so stacking
+// base, mask, hat, then item draws the whole figure, in the same order as iOS CostumeView.
+function CostumeSprite({ costume }: { costume: Costume }) {
+  return (
+    <div className="host-costume" aria-hidden="true">
+      {['base', costume.mask, costume.hat, costume.item].map((name) => (
+        <img key={name} src={`/sprites/${name}.png`} alt="" />
+      ))}
+    </div>
+  );
+}
 
+// Names stay as text (#30), so a trait is never told apart by the picture alone.
 function CostumeTraits({ costume }: { costume: Costume }) {
   return (
     <ul className="host-traits">
       {(['hat', 'mask', 'item'] as const).map((slot) => (
-        <li key={slot}>
-          <span aria-hidden="true" className="host-trait-shape">{TRAIT_SHAPES[slot]}</span> {slot}: {costume[slot]}
-        </li>
+        <li key={slot}>{costume[slot].replace('-', ' ')}</li>
       ))}
     </ul>
   );
@@ -173,6 +181,7 @@ function SeatCard({ seat }: { seat: PublicSeat }) {
         {out && <span className="host-badge">{seat.lifeStatus === 'banished' ? 'Banished' : 'Dead'}</span>}
         {!seat.connected && !out && <span className="host-muted"> (away)</span>}
       </p>
+      {seat.costume && <CostumeSprite costume={seat.costume} />}
       {seat.costume && <CostumeTraits costume={seat.costume} />}
     </li>
   );
