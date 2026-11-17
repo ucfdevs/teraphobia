@@ -1215,10 +1215,10 @@ public extension YouResult {
 /// One costume trait, used in Search and Commune results.
 // MARK: - Trait
 public struct Trait: Codable, Equatable {
-    public let option: String
+    public let option: TraitOption
     public let slot: TraitSlot
 
-    public init(option: String, slot: TraitSlot) {
+    public init(option: TraitOption, slot: TraitSlot) {
         self.option = option
         self.slot = slot
     }
@@ -1243,7 +1243,7 @@ public extension Trait {
     }
 
     func with(
-        option: String? = nil,
+        option: TraitOption? = nil,
         slot: TraitSlot? = nil
     ) -> Trait {
         return Trait(
@@ -1259,6 +1259,23 @@ public extension Trait {
     func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
         return String(data: try self.jsonData(), encoding: encoding)
     }
+}
+
+/// Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in
+/// web/public/sprites (#78).
+public enum TraitOption: String, Codable, Equatable {
+    case beakMask = "beak-mask"
+    case crown = "crown"
+    case dominoMask = "domino-mask"
+    case hornedHelmet = "horned-helmet"
+    case jesterCap = "jester-cap"
+    case lantern = "lantern"
+    case pitchfork = "pitchfork"
+    case pumpkinMask = "pumpkin-mask"
+    case raven = "raven"
+    case skullMask = "skull-mask"
+    case topHat = "top-hat"
+    case umbrella = "umbrella"
 }
 
 public enum TraitSlot: String, Codable, Equatable {
@@ -1424,9 +1441,11 @@ public extension PublicSeat {
 /// Public costume: one option in each of the 3 slots.
 // MARK: - Costume
 public struct Costume: Codable, Equatable {
-    public let hat, item, mask: String
+    public let hat: HatOption
+    public let item: ItemOption
+    public let mask: MaskOption
 
-    public init(hat: String, item: String, mask: String) {
+    public init(hat: HatOption, item: ItemOption, mask: MaskOption) {
         self.hat = hat
         self.item = item
         self.mask = mask
@@ -1452,9 +1471,9 @@ public extension Costume {
     }
 
     func with(
-        hat: String? = nil,
-        item: String? = nil,
-        mask: String? = nil
+        hat: HatOption? = nil,
+        item: ItemOption? = nil,
+        mask: MaskOption? = nil
     ) -> Costume {
         return Costume(
             hat: hat ?? self.hat,
@@ -1470,6 +1489,27 @@ public extension Costume {
     func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
         return String(data: try self.jsonData(), encoding: encoding)
     }
+}
+
+public enum HatOption: String, Codable, Equatable {
+    case crown = "crown"
+    case hornedHelmet = "horned-helmet"
+    case jesterCap = "jester-cap"
+    case topHat = "top-hat"
+}
+
+public enum ItemOption: String, Codable, Equatable {
+    case lantern = "lantern"
+    case pitchfork = "pitchfork"
+    case raven = "raven"
+    case umbrella = "umbrella"
+}
+
+public enum MaskOption: String, Codable, Equatable {
+    case beakMask = "beak-mask"
+    case dominoMask = "domino-mask"
+    case pumpkinMask = "pumpkin-mask"
+    case skullMask = "skull-mask"
 }
 
 /// Public status. A player removed for disconnecting 2 rounds shows as dead.

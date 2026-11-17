@@ -227,10 +227,22 @@
   color: var(--color-muted-text);
 }
 
-.host-trait-shape {
-  display: inline-block;
-  width: 1.2em;
-  color: var(--color-text);
+/* All sprites are the same size, so putting them in one grid cell stacks them exactly. */
+.host-costume {
+  display: grid;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto var(--space-sm);
+  background: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.host-costume img {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  /* Pixel art: keep the edges sharp instead of blurring when scaled. */
+  image-rendering: pixelated;
 }
 
 .host-votes {

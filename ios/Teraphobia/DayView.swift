@@ -118,10 +118,21 @@ struct ResultView: View {
                 if you.role == .monster {
                     FlavorMessage()
                 } else {
-                    Text(text)
+                    HStack(spacing: 12) {
+                        if let clueTrait {
+                            TraitView(trait: clueTrait)
+                        }
+                        Text(text)
+                    }
                 }
             }
         }
+    }
+
+    // Only Search and Commune results carry a trait.
+    private var clueTrait: Trait? {
+        guard let result, result.round == round else { return nil }
+        return result.trait
     }
 
     private var text: String {
@@ -129,10 +140,10 @@ struct ResultView: View {
         switch result.action {
         case .search:
             guard let trait = result.trait else { return "You found nothing" }
-            return "The Monster has \(trait.slot.rawValue) \(trait.option)"
+            return "The Monster has \(trait.slot.rawValue) \(trait.option.rawValue)"
         case .commune:
             guard let trait = result.trait else { return "The dead are silent" }
-            return "The Monster doesn't have \(trait.slot.rawValue) \(trait.option)"
+            return "The Monster doesn't have \(trait.slot.rawValue) \(trait.option.rawValue)"
         case .candle:
             return result.candleBlocked == true ? "The Monster blocked your candle" : "Your candle is lit for tonight"
         }
@@ -141,7 +152,7 @@ struct ResultView: View {
 
 #Preview {
     NavigationStack {
-        DayView(you: YouRole(costume: Costume(hat: "hat1", item: "item1", mask: "mask1"), monsterType: .vampire, role: .monster, seatID: "seat0"),
+        DayView(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: .vampire, role: .monster, seatID: "seat0"),
                 seats: PublicSeat.previews, round: 1, deadline: .now.addingTimeInterval(30), powerUsed: false,
                 sendAction: { _ in }, usePower: { _ in })
     }

@@ -16,6 +16,15 @@ struct PhaseLayout<Content: View>: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
 
+            // Costumes are public, so everyone can see and talk about their own.
+            Section("Your costume") {
+                HStack(spacing: 12) {
+                    CostumeView(costume: you.costume, size: 64)
+                        .accessibilityHidden(true)
+                    Text(costumeName(you.costume).capitalized)
+                }
+            }
+
             content
         }
         .navigationTitle(title)
@@ -43,6 +52,9 @@ struct PlayerPicker: View {
                     onPick(seat.seatID)
                 } label: {
                     HStack {
+                        if let costume = seat.costume {
+                            CostumeView(costume: costume)
+                        }
                         Text(seat.displayName)
                             .foregroundStyle(.primary)
                         Spacer()
@@ -51,6 +63,7 @@ struct PlayerPicker: View {
                         }
                     }
                 }
+                .accessibilityLabel(seat.costume.map { "\(seat.displayName), \(costumeName($0))" } ?? seat.displayName)
                 .accessibilityAddTraits(picked.contains(seat.seatID) ? .isSelected : [])
             }
         }
@@ -60,7 +73,7 @@ struct PlayerPicker: View {
 // Sample players for the Night and Day previews.
 extension PublicSeat {
     static let previews = ["Gui", "Cameron", "Lili", "Bernardo", "Teresa"].enumerated().map { index, name in
-        PublicSeat(connected: true, costume: Costume(hat: "hat1", item: "item1", mask: "mask1"),
+        PublicSeat(connected: true, costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask),
                    displayName: name, lifeStatus: .alive, seatID: "seat\(index)")
     }
 }
