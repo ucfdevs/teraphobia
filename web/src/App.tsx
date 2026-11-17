@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { Navigate, Routes, Route, useNavigate } from 'react-router-dom';
 import './App.css';
 import logo from './assets/logo.svg';
@@ -12,6 +12,9 @@ import CreateRoomPage from './pages/CreateRoomPage';
 import LobbyPlaceholderPage from './pages/LobbyPlaceholderPage';
 import NotFoundPage from './pages/NotFoundPage';
 import JoinFallbackPage from './pages/JoinFallbackPage';
+import GoogleSignInButton from './components/GoogleSignInButton';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 interface RoleItem {
   id: number;
@@ -191,6 +194,31 @@ export default function App() {
     navigate('/');
   };
 
+  const handleGoogleCredential = useCallback(async (credential: string) => {
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: credential }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Google sign in failed');
+      setCurrentUser(data.user);
+      persistSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        issuedAt: Date.now(),
+      });
+      navigate('/profile');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Google sign in failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
   const handleUnauthorized = () => {
     setCurrentUser(null);
     persistSession(null);
@@ -285,6 +313,21 @@ export default function App() {
           onSubmit={handleLogin}
         />
 
+        <GoogleSignInButton onCredential={handleGoogleCredential} />
+
+        <div className="card-footer">
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              navigate('/forgot-password');
+            }}
+            className="btn-link"
+          >
+            Forgot password?
+          </button>
+        </div>
+
         <div className="card-footer">
           Need an account?
           <button
@@ -336,6 +379,28 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/forgot-password"
+        element={
+          <div className="app-wrapper">
+            {renderFog()}
+            {renderHeader()}
+            <ForgotPasswordPage onBack={() => navigate('/signin')} />
+          </div>
+        }
+      />
+
+      <Route
+        path="/reset-password"
+        element={
+          <div className="app-wrapper">
+            {renderFog()}
+            {renderHeader()}
+            <ResetPasswordPage onDone={() => navigate('/signin')} />
+          </div>
+        }
+      />
+
       {/* REGISTER VIEW */}
       <Route
         path="/register"
@@ -357,6 +422,11 @@ export default function App() {
                 onEmailChange={setEmail}
                 onPasswordChange={setPassword}
                 onSubmit={handleRegister}
+              />
+
+              <GoogleSignInButton
+                onCredential={handleGoogleCredential}
+                text="signup_with"
               />
 
               <div className="card-footer">
