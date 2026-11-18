@@ -8,13 +8,17 @@ struct SignInView: View {
     }
 
     private enum Field {
-        case displayName, email, password
+        case fullName, displayName, email, password
     }
 
-    let auth: AuthClient
+    // @Bindable so $auth.loginFailed can open the Login failed page.
+    @Bindable var auth: AuthClient
+    // Set only when this is the first screen, so a guest can skip signing in.
+    var onGuest: (() -> Void)? = nil
 
     @State private var mode = Mode.signIn
     @State private var displayName = ""
+    @State private var fullName = ""
     @State private var email = ""
     @State private var password = ""
     @FocusState private var focusedField: Field?
@@ -25,8 +29,9 @@ struct SignInView: View {
 
     private var canSubmit: Bool {
         switch mode {
-        case .signIn: AuthValidation.canSignIn(email: trimmedEmail, password: password)
+        case .signIn: AuthValidation.canSignIn(login: trimmedEmail, password: password)
         case .register: AuthValidation.canRegister(email: trimmedEmail, password: password, name: displayName)
+            && !fullName.trimmingCharacters(in: .whitespaces).isEmpty
         }
     }
 
@@ -37,6 +42,9 @@ struct SignInView: View {
         } else {
             Form { signInForm }
                 .navigationTitle(mode.rawValue)
+                .navigationDestination(isPresented: $auth.loginFailed) {
+                    LoginFailedView()
+                }
         }
     }
 
@@ -51,8 +59,17 @@ struct SignInView: View {
 
         Section {
             if mode == .register {
-                TextField("Display name", text: $displayName)
-                    .textContentType(.nickname)
+                TextField("Name", text: $fullName)
+                    .textContentType(.name)
+                    .focused($focusedField, equals: .fullName)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .displayName }
+
+                // The display name is the username: unique, and it works for signing in.
+                TextField("Username", text: $displayName)
+                    .textContentType(.username)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .focused($focusedField, equals: .displayName)
                     .submitLabel(.next)
                     .onSubmit { focusedField = .email }
@@ -61,8 +78,9 @@ struct SignInView: View {
                     }
             }
 
-            TextField("Email", text: $email)
-                .textContentType(.emailAddress)
+            // Sign in takes either one in the same field; the server tells them apart by the @.
+            TextField(mode == .register ? "Email" : "Email or username", text: $email)
+                .textContentType(mode == .register ? .emailAddress : .username)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -96,6 +114,11 @@ struct SignInView: View {
             Text(error)
                 .foregroundStyle(.red)
         }
+
+        if let onGuest {
+            Button("Play as guest", action: onGuest)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func submit() {
@@ -103,9 +126,10 @@ struct SignInView: View {
         Task {
             switch mode {
             case .signIn:
-                await auth.signIn(email: trimmedEmail, password: password)
+                await auth.signIn(login: trimmedEmail, password: password)
             case .register:
-                await auth.register(email: trimmedEmail, password: password,
+                await auth.register(name: fullName.trimmingCharacters(in: .whitespaces),
+                                    email: trimmedEmail, password: password,
                                     displayName: displayName.trimmingCharacters(in: .whitespaces))
             }
             // Cleared once signed in, so the password doesn't stay in memory.

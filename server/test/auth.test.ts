@@ -88,3 +88,27 @@ describe('rate limits', () => {
     expect(res.status).toBe(201)
   })
 })
+
+describe('usernames', () => {
+  it('rejects a taken username in any case with 409', async () => {
+    const app = createApp()
+    await request(app).post('/api/auth/register').send({ email: 'first@example.com', password: 'correct-horse', displayName: 'Tera' })
+    const res = await request(app).post('/api/auth/register').send({ email: 'second@example.com', password: 'correct-horse', displayName: 'tera' })
+    expect(res.status).toBe(409)
+    expect(res.body.error).toBe('Username is already taken')
+  })
+
+  it('signs in with the username in any case', async () => {
+    const app = createApp()
+    await request(app).post('/api/auth/register').send({ email: 'named@example.com', password: 'correct-horse', displayName: 'Night Owl' })
+    const res = await request(app).post('/api/auth/login').send({ email: 'night owl', password: 'correct-horse' })
+    expect(res.status).toBe(200)
+    expect(res.body.user.email).toBe('named@example.com')
+  })
+
+  it('saves the name from Register', async () => {
+    const res = await request(createApp()).post('/api/auth/register').send({ email: 'real@example.com', password: 'correct-horse', displayName: 'Real', name: ' Ana Silva ' })
+    expect(res.status).toBe(201)
+    expect((await User.findById(res.body.user.id))!.name).toBe('Ana Silva')
+  })
+})

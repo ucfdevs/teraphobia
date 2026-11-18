@@ -8,16 +8,19 @@ import UIKit
 final class AuthClient {
     var isWorking = false
     var error: String?
+    // True after the server turns down a login, so the Login page can show LoginFailedView.
+    var loginFailed = false
     private var session = AuthClient.loadSession()
 
     var user: AuthUser? { session?.user }
 
-    func register(email: String, password: String, displayName: String) async {
-        await start("register", ["email": email, "password": password, "displayName": displayName])
+    func register(name: String, email: String, password: String, displayName: String) async {
+        await start("register", ["name": name, "email": email, "password": password, "displayName": displayName])
     }
 
-    func signIn(email: String, password: String) async {
-        await start("login", ["email": email, "password": password])
+    // login is an email or a username. The server's field is still called email.
+    func signIn(login: String, password: String) async {
+        await start("login", ["email": login, "password": password])
     }
 
     // FR-2: Google's sheet gives an ID token, and the server trades it for our own session.
@@ -87,8 +90,11 @@ final class AuthClient {
         }
         if response.status < 300, let next = try? JSONDecoder().decode(Session.self, from: response.data) {
             save(next)
+        } else if path == "login", response.status == 401 {
+            // Wrong login or password: the server answers the same for both, so the page can't tell them apart.
+            loginFailed = true
         } else {
-            // The server's own message, like "Email is already registered" or "Invalid email or password".
+            // The server's own message, like "Username is already taken".
             error = (try? JSONDecoder().decode(AuthError.self, from: response.data))?.error ?? "Something went wrong"
         }
     }

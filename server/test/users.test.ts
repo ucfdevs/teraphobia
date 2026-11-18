@@ -74,3 +74,13 @@ describe('PATCH /api/users/me', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('PATCH /api/users/me username', () => {
+  it('rejects a name someone else has with 409', async () => {
+    await createUser({ displayName: 'Taken' })
+    const user = await createUser()
+    const res = await request(app).patch('/api/users/me').set('Authorization', bearer(user)).send({ displayName: 'taken' })
+    expect(res.status).toBe(409)
+    expect((await User.findById(user.id))!.displayName).toBe(user.displayName)
+  })
+})

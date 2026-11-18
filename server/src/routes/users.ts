@@ -57,7 +57,17 @@ async function updateMe(req: Request, res: Response) {
     update.avatarId = avatarId.trim()
   }
 
-  const user = await User.findByIdAndUpdate(req.userId, update, { returnDocument: 'after' })
+  let user
+  try {
+    user = await User.findByIdAndUpdate(req.userId, update, { returnDocument: 'after' })
+  } catch (err) {
+    // 11000 is MongoDB's duplicate key error: someone else has that username.
+    if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ error: 'Username is already taken' })
+      return
+    }
+    throw err
+  }
   if (!user) {
     res.status(401).json({ error: 'Account not found' })
     return

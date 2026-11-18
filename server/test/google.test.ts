@@ -91,3 +91,13 @@ describe('POST /api/auth/google', () => {
     expect(verifyMock).not.toHaveBeenCalled()
   })
 })
+
+describe('Google usernames', () => {
+  it('adds digits when the Google name is taken', async () => {
+    await createUser({ displayName: 'Same Name' })
+    googleReturns({ googleId: 'g-same', email: 'same@example.com', name: 'Same Name' })
+    const res = await request(app).post('/api/auth/google').send({ idToken: 'token' })
+    expect(res.status).toBe(200)
+    expect(res.body.user.displayName).toMatch(/^Same Name \d{4}$/)
+  })
+})
