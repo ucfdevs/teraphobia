@@ -12,6 +12,7 @@ import CreateRoomPage from './pages/CreateRoomPage';
 import LobbyPlaceholderPage from './pages/LobbyPlaceholderPage';
 import NotFoundPage from './pages/NotFoundPage';
 import JoinFallbackPage from './pages/JoinFallbackPage';
+import HostScreenPreview from './host/HostScreenPreview';
 import GoogleSignInButton from './components/GoogleSignInButton';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -300,6 +301,19 @@ export default function App() {
     return matchesFilter && matchesSearch;
   });
 
+  const renderHostBrand = () => (
+    <header className="brand-header host-brand-header">
+      <button
+        type="button"
+        onClick={goHome}
+        className="host-brand-button"
+        aria-label="Return to home page"
+      >
+        <img src={logo} alt="Teraphobia Logo" className="brand-logo" />
+      </button>
+    </header>
+  );
+
   const renderHeader = () => (
     <header className="brand-header">
       <button
@@ -525,12 +539,14 @@ export default function App() {
           currentUser && session ? (
             <div className="app-wrapper">
               {renderFog()}
-              {renderHeader()}
-              <HostScreen
-                session={session}
-                onSessionChange={persistSession}
-                onExit={() => navigate('/app')}
-              />
+              <div className="host-layout">
+                {renderHostBrand()}
+                <HostScreen
+                  session={session}
+                  onSessionChange={persistSession}
+                  onExit={() => navigate('/app')}
+                />
+              </div>
             </div>
           ) : (
             <NotFoundPage />
@@ -701,6 +717,20 @@ export default function App() {
       {/* ISSUE #11 REQUIRED ROUTES */}
       <Route path="/rooms/new" element={<CreateRoomPage />} />
       <Route path="/lobby" element={<LobbyPlaceholderPage />} />
+      {import.meta.env.DEV && (
+        <Route
+          path="/host-preview"
+          element={
+            <div className="app-wrapper">
+              {renderFog()}
+              <div className="host-layout">
+                {renderHostBrand()}
+                <HostScreenPreview />
+              </div>
+            </div>
+          }
+        />
+      )}
       <Route path="*" element={<NotFoundPage />} />
     </Routes >
   );
