@@ -55,7 +55,9 @@ struct JoinView: View {
 
                     Button("Join") {
                         Task {
-                            await client.join(code: roomCode, displayName: displayName.trimmingCharacters(in: .whitespaces))
+                            // The access token lasts 15 minutes, so a fresh one is fetched right before joining.
+                            await auth.refresh()
+                            await client.join(code: roomCode, displayName: displayName.trimmingCharacters(in: .whitespaces), accessToken: auth.accessToken)
                         }
                     }
                     .disabled(!JoinValidation.canJoin(code: roomCode, name: displayName) || client.isJoining)

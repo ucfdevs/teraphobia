@@ -14,6 +14,9 @@ final class AuthClient {
 
     var user: AuthUser? { session?.user }
 
+    // Sent when joining a room, so the seat counts toward this account's stats.
+    var accessToken: String? { session?.accessToken }
+
     func register(name: String, email: String, password: String, displayName: String) async {
         await start("register", ["name": name, "email": email, "password": password, "displayName": displayName])
     }

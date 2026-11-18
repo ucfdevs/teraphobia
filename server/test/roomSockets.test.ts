@@ -137,6 +137,15 @@ describe('room:join', () => {
     expect(await hostSees).toEqual(state)
   })
 
+  it('lets a phone with an expired token in as a guest', async () => {
+    const { code } = await hostedRoom()
+    const phone = client({ token: 'not-a-token', player: true })
+    const { state, error } = await sendJoin(phone, code, 'Tera')
+    expect(error).toBeUndefined()
+    expect(state.seats).toHaveLength(1)
+    expect(getRoom(code)!.seats[0].userId).toBeUndefined()
+  })
+
   it('answers room_not_found for an unknown code', async () => {
     expect(await joinError('ZZZZ', 'Tera')).toEqual({ code: 'room_not_found', message: 'No room with that code', event: 'room:join' })
   })
