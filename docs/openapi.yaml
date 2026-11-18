@@ -73,8 +73,13 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 32
-                  description: Trimmed. Defaults to the part of the email before `@` (first 32 characters).
+                  description: Trimmed. Also the username, unique ignoring case. Defaults to the part of the email before `@` (first 32 characters).
                   example: Ana
+                name:
+                  type: string
+                  maxLength: 64
+                  description: The player's real name. Optional, trimmed, kept private.
+                  example: Ana Silva
       responses:
         '201':
           description: Account created and signed in
@@ -91,11 +96,13 @@ paths:
                 password: { value: { error: Password must be at least 8 characters } }
                 displayName: { value: { error: Display name must be 1 to 32 characters } }
         '409':
-          description: The email is already registered
+          description: The email is already registered, or the display name is taken
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example: { error: Email is already registered }
+              examples:
+                email: { value: { error: Email is already registered } }
+                displayName: { value: { error: Username is already taken } }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /auth/login:
@@ -103,7 +110,7 @@ paths:
       tags: [Auth]
       operationId: login
       security: []
-      summary: Sign in with email and password
+      summary: Sign in with an email or username, and a password
       requestBody:
         required: true
         content:
@@ -114,7 +121,7 @@ paths:
               properties:
                 email:
                   type: string
-                  format: email
+                  description: The email, or the username (display name, any case). A value with `@` is always treated as an email.
                   example: ana@example.com
                 password:
                   type: string
@@ -476,6 +483,12 @@ paths:
                 displayName: { value: { error: Display name must be 1 to 32 characters } }
                 avatarId: { value: { error: Avatar id must be 1 to 32 characters } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Someone else has that display name (usernames are unique, ignoring case)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: Username is already taken }
 
   /users/me/games:
     get:

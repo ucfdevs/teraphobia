@@ -165,6 +165,43 @@ body {
   color: #94a3b8;
 }
 
+.google-signin-section {
+  margin-top: 1.25rem;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.875rem;
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #1e293b;
+}
+
+.auth-divider span {
+  white-space: nowrap;
+}
+
+.google-signin-button {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 356px;
+  min-height: 40px;
+  margin-inline: auto;
+}
+
 .btn-link {
   background: none;
   border: none;

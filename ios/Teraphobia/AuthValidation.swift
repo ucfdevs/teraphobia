@@ -22,8 +22,9 @@ nonisolated enum AuthValidation {
         return !trimmed.isEmpty && trimmed.count <= maxNameLength
     }
 
-    static func canSignIn(email: String, password: String) -> Bool {
-        isValidEmail(email) && !password.isEmpty
+    // Sign in takes an email or a username, so only "not empty" can be checked here.
+    static func canSignIn(login: String, password: String) -> Bool {
+        !login.isEmpty && !password.isEmpty
     }
 
     static func canRegister(email: String, password: String, name: String) -> Bool {

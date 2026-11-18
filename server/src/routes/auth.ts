@@ -9,7 +9,7 @@ import { signAccessToken } from '../lib/session.js'
 import { EMAIL_PATTERN, normalizeEmail, passwordError, validDisplayName } from '../lib/validation.js'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { AuthToken, consumeToken, createdRecently, createToken, hashToken, revokeRefreshTokens } from '../models/authToken.js'
-import { User } from '../models/user.js'
+import { NAME_COLLATION, User } from '../models/user.js'
 
 const BCRYPT_ROUNDS = 12
 const MONGO_DUPLICATE_KEY = 11000
@@ -65,7 +65,7 @@ async function sendSession(res: Response, status: number, user: UserDoc) {
 //register function
 async function register(req: Request, res: Response) {
   const email = normalizeEmail(req.body?.email)
-  const { password, displayName } = req.body ?? {}
+  const { password, displayName, name: fullName } = req.body ?? {}
 
   if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
     res.status(400).json({ error: 'A valid email is required' })
@@ -84,31 +84,39 @@ async function register(req: Request, res: Response) {
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
   try {
-    const user = await User.create({ email, passwordHash, displayName: name })
+    const realName = typeof fullName === 'string' ? fullName.trim().slice(0, 64) : ''
+    const user = await User.create({ email, passwordHash, displayName: name, name: realName || undefined })
     await emailVerificationLink(user)
     await sendSession(res, 201, user)
   } catch (err) {
     if ((err as { code?: number }).code === MONGO_DUPLICATE_KEY) {
-      res.status(409).json({ error: 'Email is already registered' })
+      // keyPattern names the unique field that clashed.
+      const nameTaken = (err as { keyPattern?: Record<string, number> }).keyPattern?.displayName
+      res.status(409).json({ error: nameTaken ? 'Username is already taken' : 'Email is already registered' })
       return
     }
     throw err
   }
 }
 
-//login
+//login with an email or a username
 async function login(req: Request, res: Response) {
-  const email = normalizeEmail(req.body?.email)
+  // The field is still called email so the web login keeps working; it can hold a username too.
+  const login = typeof req.body?.email === 'string' ? req.body.email.trim() : ''
   const { password } = req.body ?? {}
 
-  if (!email || typeof password !== 'string') {
+  if (!login || typeof password !== 'string') {
     res.status(400).json({ error: 'Email and password are required' })
     return
   }
 
-  const user = await User.findOne({ email })
+  // Usernames can't be emails here: with an @ it's always looked up as an email.
+  const user = login.includes('@')
+    ? await User.findOne({ email: normalizeEmail(login) })
+    : await User.findOne({ displayName: login }).collation(NAME_COLLATION)
   const matches = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)
   if (!user?.passwordHash || !matches) {
+    // Same message for every miss, so it never says whether the account exists.
     res.status(401).json({ error: 'Invalid email or password' })
     return
   }
@@ -135,6 +143,15 @@ async function resendVerification(req: Request, res: Response) {
   res.json({ message: RESEND_VERIFICATION_MESSAGE })
 }
 
+// Google names aren't unique, so a taken one gets 4 random digits, like "Ana Silva 4821".
+async function freeDisplayName(name: string) {
+  let candidate = name
+  while (await User.exists({ displayName: candidate }).collation(NAME_COLLATION)) {
+    candidate = `${name.slice(0, 27)} ${Math.floor(1000 + Math.random() * 9000)}`
+  }
+  return candidate
+}
+
 // Finds the user for a Google identity: by googleId, else links the account with the same email, else creates one.
 async function findOrCreateGoogleUser(identity: GoogleIdentity): Promise<UserDoc | null> {
   const email = normalizeEmail(identity.email)
@@ -155,11 +172,11 @@ async function findOrCreateGoogleUser(identity: GoogleIdentity): Promise<UserDoc
     return existing.save()
   }
 
-  const displayName = validDisplayName(identity.name?.slice(0, 32)) ?? validDisplayName(email.split('@')[0].slice(0, 32)) ?? 'Player'
+  const displayName = await freeDisplayName(validDisplayName(identity.name?.slice(0, 32)) ?? validDisplayName(email.split('@')[0].slice(0, 32)) ?? 'Player')
   try {
     return await User.create({ email, googleId: identity.googleId, emailVerified: true, displayName })
   } catch (err) {
-    // Another request created the account first; link to it instead.
+    // Another request took the email or the name first; this runs again and links or picks a new name.
     if ((err as { code?: number }).code === MONGO_DUPLICATE_KEY) return findOrCreateGoogleUser(identity)
     throw err
   }
