@@ -112,7 +112,12 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     const token: unknown = socket.handshake.auth?.token
     if (token === undefined) return next()
     const userId = typeof token === 'string' ? verifyAccessToken(token) : null
-    if (!userId) return next(new Error('Invalid or expired token'))
+    if (!userId) {
+      // A phone's access token can expire mid-game, and socket.io resends it on every reconnect.
+      // The phone comes in as a guest and its rejoin token still gets the seat back.
+      if (socket.handshake.auth?.player === true) return next()
+      return next(new Error('Invalid or expired token'))
+    }
     ;(socket.data as SocketData).userId = userId
     ;(socket.data as SocketData).signedInPlayer = socket.handshake.auth?.player === true
     next()

@@ -39,7 +39,7 @@ final class RoomClient {
     // From you:joined. Sent back in room:join after a drop to get the same seat.
     private var rejoinToken: String?
 
-    func join(code: String, displayName: String) async {
+    func join(code: String, displayName: String, accessToken: String? = nil) async {
         roomError = nil
         nameError = nil
         isJoining = true
@@ -49,7 +49,7 @@ final class RoomClient {
             isJoining = false
             return
         }
-        connect(code: code, displayName: displayName)
+        connect(code: code, displayName: displayName, accessToken: accessToken)
     }
 
     func leave() {
@@ -105,7 +105,7 @@ final class RoomClient {
         }
     }
 
-    private func connect(code: String, displayName: String) {
+    private func connect(code: String, displayName: String, accessToken: String?) {
         // A dropped socket retries every 1 to 5 seconds (the default is 10 to 30) and rejoins with the token.
         let manager = SocketManager(socketURL: Self.serverURL, config: [.reconnectWait(1), .reconnectWaitMax(5)])
         let socket = manager.defaultSocket
@@ -193,7 +193,8 @@ final class RoomClient {
             roomError = kicked ? "You were removed from the room" : "Lost connection to the room"
             leave()
         }
-        socket.connect()
+        // Signed in, the server ties this seat to the account (FR-13). Guests send no payload.
+        socket.connect(withPayload: accessToken.map { ["token": $0, "player": true] })
     }
 
     // socket.io sends and receives dictionaries, so payloads go through JSON to reach the generated types.
