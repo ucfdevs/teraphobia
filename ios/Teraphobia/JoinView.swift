@@ -80,6 +80,17 @@ struct JoinView: View {
                 .navigationDestination(isPresented: $client.joined) {
                     GameView(client: client)
                 }
+                // Errors show up without moving focus, so VoiceOver reads them out.
+                .onChange(of: client.nameError) {
+                    if let nameError = client.nameError {
+                        AccessibilityNotification.Announcement(nameError).post()
+                    }
+                }
+                .onChange(of: client.roomError) {
+                    if let roomError = client.roomError {
+                        AccessibilityNotification.Announcement(roomError).post()
+                    }
+                }
             }
         }
         .tint(.orange)

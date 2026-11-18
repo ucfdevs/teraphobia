@@ -53,6 +53,17 @@ struct GameView: View {
         } message: {
             Text(client.gameError ?? "")
         }
+        // VoiceOver doesn't read a new screen title by itself, so it says when a phase starts or the connection drops.
+        .onChange(of: client.phase) {
+            if let phase = client.phase {
+                AccessibilityNotification.Announcement(phase.phase.rawValue.capitalized).post()
+            }
+        }
+        .onChange(of: client.reconnecting) {
+            if client.reconnecting {
+                AccessibilityNotification.Announcement("Reconnecting").post()
+            }
+        }
     }
 }
 

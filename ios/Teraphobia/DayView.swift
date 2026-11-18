@@ -76,7 +76,9 @@ struct DayView: View {
                     .foregroundStyle(.primary)
                 Spacer()
                 if action == value {
+                    // The Selected trait already says this, so VoiceOver doesn't read "checkmark" too.
                     Image(systemName: "checkmark")
+                        .accessibilityHidden(true)
                 }
             }
         }
