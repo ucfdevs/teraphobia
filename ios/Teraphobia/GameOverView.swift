@@ -38,7 +38,10 @@ struct GameOverView: View {
                 Text("\(monsterName) was the \(gameOver.monster.monsterType.rawValue.capitalized). \(reason)")
             }
         } actions: {
+            // Large, so the button meets the 44-point minimum tap target.
             Button("Done", action: done)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
         }
         .navigationBarBackButtonHidden()
     }

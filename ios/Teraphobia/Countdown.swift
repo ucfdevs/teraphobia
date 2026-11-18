@@ -10,6 +10,8 @@ struct Countdown: View {
             Text("\(left)s")
                 .font(.title3.monospacedDigit())
                 .accessibilityLabel("\(left) seconds left")
+                // Toolbar text doesn't grow with Dynamic Type, so a long press shows it large instead.
+                .accessibilityShowsLargeContentViewer()
         }
     }
 }

@@ -45,6 +45,12 @@ struct SignInView: View {
                 .navigationDestination(isPresented: $auth.loginFailed) {
                     LoginFailedView()
                 }
+                // Errors show up without moving focus, so VoiceOver reads them out.
+                .onChange(of: auth.error) {
+                    if let error = auth.error {
+                        AccessibilityNotification.Announcement(error).post()
+                    }
+                }
         }
     }
 
