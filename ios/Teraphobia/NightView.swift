@@ -21,9 +21,22 @@ struct NightView: View {
         return current.maxPicks == 2 ? "Pick one or two victims" : "Pick a victim"
     }
 
+    // The rule in plain words.
+    private var hint: String {
+        if you.role == .villager {
+            return "Tap the player you think is the Monster. Your hunch stays secret, and you can change it until Night ends."
+        }
+        if current.maxPicks == 2 {
+            return "Tap one or two players to kill tonight. You can change your picks until Night ends."
+        }
+        return "Tap the player you want to kill tonight. You can change your pick until Night ends."
+    }
+
     var body: some View {
         // Only the Monster's phone is choosing a victim, so only it gets its type's look. Villagers stay neutral.
-        PhaseLayout(title: "Night \(round)", deadline: deadline, you: you, look: ScreenLook(you: you, moment: .choosingVictim)) {
+        PhaseLayout(title: "Night \(round)", deadline: deadline, you: you, heading: "The village sleeps",
+                    look: ScreenLook(you: you, moment: .choosingVictim)) {
+            StrangerSays(text: hint)
             PlayerPicker(header: header, seats: seats, you: you, picked: current.picked, onPick: pick)
         }
     }
