@@ -186,6 +186,31 @@ function CostumeSprite({ costume }: { costume: Costume }) {
   );
 }
 
+const COSTUME_NAMES: Record<string, string> = {
+  hat1 : "Top Hat",
+  hat2 : "Jester Cap",
+  hat3 : "Crown",
+  hat4 : "Horned Helmet",
+
+  mask1 : "Domino Mask",
+  mask2 : "Beak Mask",
+  mask3 : "Pumpkin Mask",
+  mask4 : "Skull Mask",
+
+  item1 : "Lantern",
+  item2 : "Pitchfork",
+  item3 : "Umbrella",
+  item4 : "Raven"
+}
+
+// Fallback: if an id isn't in the table, turn "hat-2" / "hat2" into "hat 2"
+function costumeName(id: string): string {
+  return (
+    COSTUME_NAMES[id] ??
+    id.replace(/[-_]/g, ' ').replace(/([a-z])(\d)/i, '$1 $2')
+  );
+}
+
 // Names stay as text (#30), so a trait is never told apart by the picture alone.
 function CostumeTraits({ costume }: { costume: Costume }) {
   const traits = [
@@ -198,7 +223,7 @@ function CostumeTraits({ costume }: { costume: Costume }) {
     <ul className="host-traits">
       {traits.map(({ slot, label }) => (
         <li key={slot}>
-          <strong>{label}:</strong> {costume[slot].replace('-', ' ')}
+          <strong>{label}:</strong> {costumeName(costume[slot])}
         </li>
       ))}
     </ul>
