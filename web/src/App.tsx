@@ -361,19 +361,6 @@ export default function App() {
         <GoogleSignInButton onCredential={handleGoogleCredential} />
 
         <div className="card-footer">
-          <button
-            type="button"
-            onClick={() => {
-              resetForm();
-              navigate('/forgot-password');
-            }}
-            className="btn-link"
-          >
-            Forgot password?
-          </button>
-        </div>
-
-        <div className="card-footer">
           <div style={{ marginBottom: '0.5rem' }}>
             <button
               type="button"
