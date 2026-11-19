@@ -9,11 +9,15 @@ extension RoomClient {
         guard let index = arguments.firstIndex(of: "-screen"), index + 1 < arguments.count else { return nil }
 
         let client = RoomClient()
-        let you = YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: nil, role: .villager, seatID: "seat0")
+        // "-monster vampire" (or witch, werewolf) makes this phone the Monster, to see its look.
+        let monsterType = arguments.firstIndex(of: "-monster").flatMap { $0 + 1 < arguments.count ? MonsterType(rawValue: arguments[$0 + 1]) : nil }
+        let you = YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: monsterType,
+                          role: monsterType == nil ? .villager : .monster, seatID: "seat0")
         client.seatID = you.seatID
         client.you = you
         client.room = RoomState(code: "ABCD", hostConnected: true, preset: .normal, seats: PublicSeat.previews, status: .playing)
         client.phaseDeadline = .now.addingTimeInterval(60)
+        client.phaseStartedAt = .now.addingTimeInterval(-30)
 
         switch arguments[index + 1] {
         case "reconnecting":

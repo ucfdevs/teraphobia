@@ -1,71 +1,85 @@
 import SwiftUI
+import UIKit
 
-/// Teraphobia iOS Design Tokens — synced with shared/design-tokens.json
-enum TeraphobiaTokens {
-    enum Colors {
-        static let background = Color(hex: 0x090D1A)
-        static let backgroundElevated = Color(hex: 0x11162B)
-        static let surface = Color(hex: 0x141B2E)
-        static let surfaceHover = Color(hex: 0x1C2540)
-        static let border = Color(hex: 0x2A3554)
-        static let text = Color(hex: 0xF8FAFC)
-        static let mutedText = Color(hex: 0x94A3B8)
-        static let accent = Color(hex: 0xF97316)
-        static let accentHover = Color(hex: 0xFB923C)
-        static let accentText = Color(hex: 0x090D1A)
-        static let danger = Color(hex: 0xDC2626)
-        static let dangerHover = Color(hex: 0xB91C1C)
-        static let dangerLight = Color(hex: 0xFCA5A5)
-        static let dangerText = Color(hex: 0xFFFFFF)
+// The iOS look. The navy, text and candle values match shared/design-tokens.json. The blood, phase and
+// Monster colors are iOS-only, so they live here and the web tokens stay as they are.
+enum Theme {
+    // Moonlit navy.
+    static let night = Color(hex: 0x090D1A)
+    static let nightRaised = Color(hex: 0x11162B)
+    static let surface = Color(hex: 0x141B2E)
+    static let border = Color(hex: 0x2A3554)
+    static let text = Color(hex: 0xF8FAFC)
+    static let mutedText = Color(hex: 0x94A3B8)
+
+    // Candle orange is the only color you tap. Text on it is navy, since white on orange is too faint to read.
+    static let candle = Color(hex: 0xF97316)
+    static let candleEdge = Color(hex: 0xC2410C)
+    static let onCandle = Color(hex: 0x090D1A)
+
+    // Blood red is the brand and the color of death, the same red as the website's buttons and logo.
+    static let blood = Color(hex: 0xA81818)
+    static let moon = Color(hex: 0xEDEBD6)
+    static let gold = Color(hex: 0xF5C542)
+
+    // Day: dusky purple over an ember horizon. Discussion and Vote: near-black lit by a candle.
+    static let duskTop = Color(hex: 0x140B24)
+    static let dusk = Color(hex: 0x2A1740)
+    static let ember = Color(hex: 0xE2583E)
+    static let candlelit = Color(hex: 0x07080D)
+
+    // One color per Monster type, for the Monster look.
+    static let vampire = Color(hex: 0xC81E2E)
+    static let witch = Color(hex: 0x4ADE80)
+    static let werewolf = Color(hex: 0xF59E0B)
+
+    static let radius: CGFloat = 14
+    static let borderWidth: CGFloat = 2
+    // Side margin for game and account screens.
+    static let gutter: CGFloat = 20
+
+    static let displayFontName = "BricolageGrotesque-ExtraBold"
+}
+
+extension Font {
+    // Bricolage Grotesque ExtraBold for headings. It grows with Dynamic Type like the text style it's given.
+    static func display(_ style: Font.TextStyle = .largeTitle) -> Font {
+        .custom(Theme.displayFontName, size: style.defaultSize, relativeTo: style)
     }
 
-    enum Typography {
-        static let fontDisplayName = "BricolageGrotesque-Bold"
-        static let fontBodyName = "IBMPlexSans-Regular"
-        static let fontMonoName = "IBMPlexMono-Regular"
-
-        static let xs: CGFloat = 12
-        static let sm: CGFloat = 14
-        static let base: CGFloat = 16
-        static let lg: CGFloat = 18
-        static let xl: CGFloat = 20
-        static let xxl: CGFloat = 24
-        static let xxxl: CGFloat = 32
-        static let xxxxl: CGFloat = 44
-
-        static func display(_ size: CGFloat = xxl) -> Font {
-            .custom(fontDisplayName, size: size, relativeTo: .title)
-        }
-
-        static func body(_ size: CGFloat = base) -> Font {
-            .custom(fontBodyName, size: size, relativeTo: .body)
-        }
-
-        static func mono(_ size: CGFloat = sm) -> Font {
-            .custom(fontMonoName, size: size, relativeTo: .caption)
-        }
-    }
-
-    enum Spacing {
-        static let xs: CGFloat = 4
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 24
-        static let xxl: CGFloat = 32
-        static let xxxl: CGFloat = 48
-    }
-
-    enum Radii {
-        static let sm: CGFloat = 6
-        static let md: CGFloat = 10
-        static let lg: CGFloat = 14
-        static let xl: CGFloat = 20
-        static let full: CGFloat = 9999
+    // Numbers (countdowns, room codes) in SF Mono, so digits don't shift as they change.
+    static func numbers(_ style: Font.TextStyle = .body) -> Font {
+        .system(style, design: .monospaced).weight(.bold)
     }
 }
 
-private extension Color {
+extension UIFont {
+    // For UIKit-drawn text such as the navigation bar title. Falls back to the system font if the file is missing.
+    static func display(size: CGFloat) -> UIFont {
+        UIFont(name: Theme.displayFontName, size: size) ?? .systemFont(ofSize: size, weight: .heavy)
+    }
+}
+
+private extension Font.TextStyle {
+    // Point sizes at the default text size, from Apple's type scale.
+    var defaultSize: CGFloat {
+        switch self {
+        case .largeTitle: 34
+        case .title: 28
+        case .title2: 22
+        case .title3: 20
+        case .headline, .body: 17
+        case .callout: 16
+        case .subheadline: 15
+        case .footnote: 13
+        case .caption: 12
+        case .caption2: 11
+        @unknown default: 17
+        }
+    }
+}
+
+extension Color {
     init(hex: UInt32, alpha: Double = 1.0) {
         let red = Double((hex >> 16) & 0xFF) / 255.0
         let green = Double((hex >> 8) & 0xFF) / 255.0

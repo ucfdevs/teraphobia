@@ -9,6 +9,11 @@ struct GameView: View {
         client.room?.seats.first { $0.seatID == client.seatID }?.lifeStatus ?? .alive
     }
 
+    // Dead and banished players, for the death sting.
+    private var outCount: Int {
+        client.room?.seats.filter { $0.lifeStatus != .alive }.count ?? 0
+    }
+
     var body: some View {
         Group {
             if client.reconnecting {
@@ -48,6 +53,8 @@ struct GameView: View {
                 WaitingRoomView(client: client)
             }
         }
+        .environment(\.gameBackdrop, client.phase.map { Backdrop(phase: $0.phase) } ?? .plain)
+        .environment(\.phaseStartedAt, client.phaseStartedAt)
         .alert("Not allowed", isPresented: Binding(get: { client.gameError != nil }, set: { _ in client.gameError = nil })) {
             Button("OK") {}
         } message: {
@@ -57,7 +64,28 @@ struct GameView: View {
         .onChange(of: client.phase) {
             if let phase = client.phase {
                 AccessibilityNotification.Announcement(phase.phase.rawValue.capitalized).post()
+                // Every phone plays these at once. A rejoin lands mid-phase, so it stays quiet.
+                if !client.phaseFromRejoin {
+                    switch phase.phase {
+                    case .night: SoundEngine.shared.play(.nightFalls)
+                    case .morning: SoundEngine.shared.play(.dayBreaks)
+                    default: break
+                    }
+                }
             }
+        }
+        // Someone died or was banished. Late, so it lands after the morning bell.
+        .onChange(of: outCount) { old, new in
+            guard new > old, !client.phaseFromRejoin else { return }
+            Task {
+                try? await Task.sleep(for: .seconds(1))
+                SoundEngine.shared.play(.death)
+            }
+        }
+        .onChange(of: client.gameOver) {
+            guard let gameOver = client.gameOver, let you = client.you else { return }
+            let youWon = (gameOver.winner == .monster) == (you.role == .monster)
+            SoundEngine.shared.play(youWon ? .youWin : .youLose)
         }
         .onChange(of: client.reconnecting) {
             if client.reconnecting {

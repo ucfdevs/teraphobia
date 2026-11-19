@@ -5,9 +5,11 @@ import SwiftUI
 struct CostumeView: View {
     let costume: Costume
     var size: CGFloat = 44
+    // The gray box behind the figure. Off inside cards, which already have their own background.
+    var boxed = true
 
     var body: some View {
-        SpriteStack(names: ["base", costume.mask.rawValue, costume.hat.rawValue, costume.item.rawValue], size: size)
+        SpriteStack(names: ["base", costume.mask.rawValue, costume.hat.rawValue, costume.item.rawValue], size: size, boxed: boxed)
             .accessibilityElement()
             .accessibilityLabel(costumeName(costume))
     }
@@ -17,16 +19,30 @@ struct CostumeView: View {
 struct TraitView: View {
     let trait: Trait
     var size: CGFloat = 64
+    var boxed = true
 
     var body: some View {
-        SpriteStack(names: ["base", trait.option.rawValue], size: size)
+        SpriteStack(names: ["base", trait.option.rawValue], size: size, boxed: boxed)
             .accessibilityHidden(true)
     }
 }
 
-private struct SpriteStack: View {
+// The plain base figure with no costume: the Stranger, who is the app's mascot and stands in
+// for any player whose costume isn't known yet.
+struct StrangerView: View {
+    var size: CGFloat = 72
+    var boxed = false
+
+    var body: some View {
+        SpriteStack(names: ["base"], size: size, boxed: boxed)
+            .accessibilityHidden(true)
+    }
+}
+
+struct SpriteStack: View {
     let names: [String]
     let size: CGFloat
+    var boxed = true
 
     var body: some View {
         ZStack {
@@ -39,7 +55,7 @@ private struct SpriteStack: View {
             }
         }
         .frame(width: size, height: size)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        .background(boxed ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -53,7 +69,8 @@ func costumeName(_ costume: Costume) -> String {
 #Preview {
     HStack {
         CostumeView(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), size: 96)
-        CostumeView(costume: Costume(hat: .crown, item: .raven, mask: .skullMask), size: 96)
+        CostumeView(costume: Costume(hat: .crown, item: .raven, mask: .skullMask), size: 96, boxed: false)
         TraitView(trait: Trait(option: .jesterCap, slot: .hat), size: 96)
+        StrangerView(size: 96)
     }
 }

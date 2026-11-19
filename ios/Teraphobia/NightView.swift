@@ -22,7 +22,8 @@ struct NightView: View {
     }
 
     var body: some View {
-        PhaseLayout(title: "Night \(round)", deadline: deadline, you: you) {
+        // Only the Monster's phone is choosing a victim, so only it gets its type's look. Villagers stay neutral.
+        PhaseLayout(title: "Night \(round)", deadline: deadline, you: you, look: ScreenLook(you: you, moment: .choosingVictim)) {
             PlayerPicker(header: header, seats: seats, you: you, picked: current.picked, onPick: pick)
         }
     }

@@ -24,6 +24,10 @@ final class RoomClient {
     var you: YouRole?
     var phase: PhaseStart?
     var phaseDeadline = Date()
+    // When this phase began on the phone, so the countdown ring knows how full to be.
+    var phaseStartedAt: Date?
+    // True when the phase came back from a rejoin rather than starting, so its sound doesn't play again.
+    var phaseFromRejoin = false
     var result: YouResult?
     var powerUsed = false
     var nightVictims = 0
@@ -38,6 +42,8 @@ final class RoomClient {
     private var manager: SocketManager?
     // From you:joined. Sent back in room:join after a drop to get the same seat.
     private var rejoinToken: String?
+    // The full length of each phase, seen at its phase:start. A rejoin only gets the time left, so it uses these to find the start.
+    private var phaseLengths: [Phase: TimeInterval] = [:]
 
     func join(code: String, displayName: String, accessToken: String? = nil) async {
         roomError = nil
@@ -63,6 +69,9 @@ final class RoomClient {
         seatID = nil
         you = nil
         phase = nil
+        phaseStartedAt = nil
+        phaseFromRejoin = false
+        phaseLengths = [:]
         result = nil
         powerUsed = false
         nightVictims = 0
@@ -138,7 +147,11 @@ final class RoomClient {
             }
             phase = next
             // The phone's clock can differ from the server's, so only the time left is used.
-            phaseDeadline = Date().addingTimeInterval(Double(next.endsAt - next.serverNow) / 1000)
+            let length = Double(next.endsAt - next.serverNow) / 1000
+            phaseDeadline = Date().addingTimeInterval(length)
+            phaseStartedAt = Date()
+            phaseLengths[next.phase] = length
+            phaseFromRejoin = false
             gameError = nil
         }
         socket.on("you:result") { [weak self] data, _ in
@@ -151,9 +164,13 @@ final class RoomClient {
             guard let self, let state = Self.decode(YouRejoined.self, data) else { return }
             room = state.room
             you = state.you
+            phaseFromRejoin = true
             phase = state.phase
             if let next = state.phase {
                 phaseDeadline = Date().addingTimeInterval(Double(next.endsAt - next.serverNow) / 1000)
+                // Without a length from an earlier phase:start, the ring starts full from now.
+                let deadline = phaseDeadline
+                phaseStartedAt = phaseLengths[next.phase].map { deadline.addingTimeInterval(-$0) } ?? Date()
             }
             result = state.results.last
             if let used = state.powerUsed { powerUsed = used }
