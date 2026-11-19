@@ -124,7 +124,7 @@ struct ResultView: View {
                         if let clueTrait {
                             TraitView(trait: clueTrait)
                         }
-                        Text(text)
+                        Text(ClueText(result: result, round: round).text)
                     }
                 }
             }
@@ -135,20 +135,6 @@ struct ResultView: View {
     private var clueTrait: Trait? {
         guard let result, result.round == round else { return nil }
         return result.trait
-    }
-
-    private var text: String {
-        guard let result, result.round == round else { return "You didn't pick an action today." }
-        switch result.action {
-        case .search:
-            guard let trait = result.trait else { return "You found nothing" }
-            return "The Monster has \(trait.slot.rawValue) \(trait.option.rawValue)"
-        case .commune:
-            guard let trait = result.trait else { return "The dead are silent" }
-            return "The Monster doesn't have \(trait.slot.rawValue) \(trait.option.rawValue)"
-        case .candle:
-            return result.candleBlocked == true ? "The Monster blocked your candle" : "Your candle is lit for tonight"
-        }
     }
 }
 

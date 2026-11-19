@@ -6,7 +6,7 @@ struct Countdown: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let left = max(0, Int(deadline.timeIntervalSince(context.date).rounded(.up)))
+            let left = PhaseClock(deadline: deadline, now: context.date).secondsLeft
             Text("\(left)s")
                 .font(.title3.monospacedDigit())
                 .accessibilityLabel("\(left) seconds left")

@@ -81,7 +81,7 @@ final class TeraphobiaUITests: XCTestCase {
 
     func testDiscussionShowsClue() throws {
         let app = launch("discussion")
-        XCTAssertTrue(text("The Monster has hat crown", in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(text("The Monster wears the crown", in: app).waitForExistence(timeout: 5))
         try audit(app)
     }
 
