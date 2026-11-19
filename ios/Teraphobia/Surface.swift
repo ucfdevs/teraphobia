@@ -37,7 +37,8 @@ extension View {
     }
 }
 
-// Glass shapes close together should share one container so they blend and render together. A plain stack before iOS 26.
+// Glass shapes close together can share one container so they blend and render together. A plain stack before iOS 26.
+// Only for cards that never show a selected state or badges: the container's glass draws over a card's overlays.
 struct GlassGroup<Content: View>: View {
     var spacing: CGFloat = 12
     @ViewBuilder let content: Content

@@ -7,10 +7,16 @@ struct TeraphobiaApp: App {
     @State private var testClient = RoomClient.forUITest()
 
     init() {
-        // Navigation bar titles in Bricolage, like the headings.
+        // Navigation bar titles in Bricolage, like the headings, over a clear bar so the sky shows through.
+        // Since iOS 13 the bar reads its appearance objects, not the old title attributes on the proxy.
+        let look = UINavigationBarAppearance()
+        look.configureWithTransparentBackground()
+        look.titleTextAttributes = [.font: UIFont.display(size: 17), .foregroundColor: UIColor.white]
+        look.largeTitleTextAttributes = [.font: UIFont.display(size: 34), .foregroundColor: UIColor.white]
         let bar = UINavigationBar.appearance()
-        bar.titleTextAttributes = [.font: UIFont.display(size: 17)]
-        bar.largeTitleTextAttributes = [.font: UIFont.display(size: 34)]
+        bar.standardAppearance = look
+        bar.scrollEdgeAppearance = look
+        bar.compactAppearance = look
     }
 
     var body: some Scene {

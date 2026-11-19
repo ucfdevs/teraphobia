@@ -53,21 +53,20 @@ struct CostumeGrid: View {
     private let columns = [GridItem(.adaptive(minimum: 100, maximum: 160), spacing: 12)]
 
     var body: some View {
-        GlassGroup {
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(seats, id: \.seatID) { seat in
-                    let isPicked = picked.contains(seat.seatID)
-                    Button {
-                        SoundEngine.shared.play(.pick)
-                        onPick(seat.seatID)
-                    } label: {
-                        CostumeCard(name: seat.displayName, costume: seat.costume, selected: isPicked)
-                    }
-                    .buttonStyle(CardPressStyle())
-                    .sensoryFeedback(.selection, trigger: isPicked)
-                    .accessibilityLabel(seat.costume.map { "\(seat.displayName), \(costumeName($0))" } ?? seat.displayName)
-                    .accessibilityAddTraits(isPicked ? .isSelected : [])
+        // Not in a GlassGroup: its shared glass draws over the picked card's orange border and badge.
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(seats, id: \.seatID) { seat in
+                let isPicked = picked.contains(seat.seatID)
+                Button {
+                    SoundEngine.shared.play(.pick)
+                    onPick(seat.seatID)
+                } label: {
+                    CostumeCard(name: seat.displayName, costume: seat.costume, selected: isPicked)
                 }
+                .buttonStyle(CardPressStyle())
+                .sensoryFeedback(.selection, trigger: isPicked)
+                .accessibilityLabel(seat.costume.map { "\(seat.displayName), \(costumeName($0))" } ?? seat.displayName)
+                .accessibilityAddTraits(isPicked ? .isSelected : [])
             }
         }
     }
