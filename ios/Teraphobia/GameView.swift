@@ -101,11 +101,15 @@ struct WatchScreenView: View {
     let phase: Phase
     let deadline: Date
 
+    private var heading: String {
+        phase == .morning ? "Who made it to morning?" : "All eyes on the big screen"
+    }
+
     var body: some View {
-        PhaseLayout(title: phase.rawValue.capitalized, deadline: deadline, you: you) {
-            Section {
-                Text("Watch the shared screen.")
-            }
+        // Everyone's phone is on this screen at once, so it stays neutral for the Monster too.
+        PhaseLayout(title: phase.rawValue.capitalized, deadline: deadline, you: you, heading: heading,
+                    look: ScreenLook(you: you, moment: .watchingSharedScreen)) {
+            StrangerSays(text: "Watch the shared screen. Whatever crept through the night, the news is up there.")
         }
     }
 }
