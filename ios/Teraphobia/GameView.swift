@@ -9,10 +9,8 @@ struct GameView: View {
         client.room?.seats.first { $0.seatID == client.seatID }?.lifeStatus ?? .alive
     }
 
-    // Dead and banished players, for the death sting.
-    private var outCount: Int {
-        client.room?.seats.filter { $0.lifeStatus != .alive }.count ?? 0
-    }
+    // The death sting waiting to play, so it can be called off when this screen goes away.
+    @State private var deathSting: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -60,13 +58,16 @@ struct GameView: View {
         } message: {
             Text(client.gameError ?? "")
         }
+        // Loaded now, so the first sound doesn't wait on its file.
+        .task { SoundEngine.shared.prepare() }
         // VoiceOver doesn't read a new screen title by itself, so it says when a phase starts or the connection drops.
-        .onChange(of: client.phase) {
-            if let phase = client.phase {
-                AccessibilityNotification.Announcement(phase.phase.rawValue.capitalized).post()
+        // Keyed on the phase alone: a host pause resends the same phase with a new end time, and that isn't a new phase.
+        .onChange(of: client.phase?.phase) {
+            if let phase = client.phase?.phase {
+                AccessibilityNotification.Announcement(phase.rawValue.capitalized).post()
                 // Every phone plays these at once. A rejoin lands mid-phase, so it stays quiet.
                 if !client.phaseFromRejoin {
-                    switch phase.phase {
+                    switch phase {
                     case .night: SoundEngine.shared.play(.nightFalls)
                     case .morning: SoundEngine.shared.play(.dayBreaks)
                     default: break
@@ -75,13 +76,17 @@ struct GameView: View {
             }
         }
         // Someone died or was banished. Late, so it lands after the morning bell.
-        .onChange(of: outCount) { old, new in
-            guard new > old, !client.phaseFromRejoin else { return }
-            Task {
+        .onChange(of: client.deaths) { old, new in
+            guard new > old else { return }
+            deathSting?.cancel()
+            deathSting = Task {
                 try? await Task.sleep(for: .seconds(1))
+                // Left the game, or that death ended it and the win or lose sound plays instead.
+                guard !Task.isCancelled, client.gameOver == nil else { return }
                 SoundEngine.shared.play(.death)
             }
         }
+        .onDisappear { deathSting?.cancel() }
         .onChange(of: client.gameOver) {
             guard let gameOver = client.gameOver, let you = client.you else { return }
             let youWon = (gameOver.winner == .monster) == (you.role == .monster)

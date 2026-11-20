@@ -11,8 +11,8 @@ struct TeraphobiaApp: App {
         // Since iOS 13 the bar reads its appearance objects, not the old title attributes on the proxy.
         let look = UINavigationBarAppearance()
         look.configureWithTransparentBackground()
-        look.titleTextAttributes = [.font: UIFont.display(size: 17), .foregroundColor: UIColor.white]
-        look.largeTitleTextAttributes = [.font: UIFont.display(size: 34), .foregroundColor: UIColor.white]
+        look.titleTextAttributes = [.font: UIFont.display(size: 17), .foregroundColor: UIColor(Theme.text)]
+        look.largeTitleTextAttributes = [.font: UIFont.display(size: 34), .foregroundColor: UIColor(Theme.text)]
         let bar = UINavigationBar.appearance()
         bar.standardAppearance = look
         bar.scrollEdgeAppearance = look

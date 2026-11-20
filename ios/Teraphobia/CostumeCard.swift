@@ -8,6 +8,8 @@ struct CostumeCard: View {
     var selected = false
     var spriteSize: CGFloat = 76
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         VStack(spacing: 6) {
             Group {
@@ -34,12 +36,13 @@ struct CostumeCard: View {
                     .font(.title3)
                     .foregroundStyle(Theme.onCandle, Theme.candle)
                     .padding(6)
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
                     // The Selected trait already says this.
                     .accessibilityHidden(true)
             }
         }
-        .animation(.spring(duration: 0.25, bounce: 0.4), value: selected)
+        // With Reduce Motion the badge fades in, with no bounce.
+        .animation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(duration: 0.25, bounce: 0.4), value: selected)
     }
 }
 

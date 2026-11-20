@@ -95,6 +95,7 @@ struct CandleButtonStyle: ButtonStyle {
 // A secondary action: a navy control with light text.
 struct QuietButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -104,18 +105,22 @@ struct QuietButtonStyle: ButtonStyle {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 48)
             .surface(.control)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            // With Reduce Motion the press only dims, below.
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.45)
             .animation(.spring(duration: 0.18), value: configuration.isPressed)
             .contentShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
     }
 }
 
-// A card you tap, like a player in a picker: it shrinks a little under the finger.
+// A card you tap, like a player in a picker: it shrinks a little under the finger, or dims with Reduce Motion.
 struct CardPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+            .opacity(configuration.isPressed && reduceMotion ? 0.8 : 1)
             .animation(.spring(duration: 0.2, bounce: 0.3), value: configuration.isPressed)
     }
 }

@@ -39,7 +39,7 @@ struct BackdropView: View {
                 LinearGradient(colors: [Theme.nightRaised, Theme.night], startPoint: .top, endPoint: .bottom)
                 Stars(count: 40, opacity: 0.5)
             case .night:
-                LinearGradient(colors: [Color(hex: 0x121733), Theme.night], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [Theme.nightTop, Theme.night], startPoint: .top, endPoint: .bottom)
                 Stars(count: 70, opacity: 0.8)
                 Moon(color: Theme.moon.opacity(0.9))
                 Fog(tint: .white, animated: !reduceMotion)

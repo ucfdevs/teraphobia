@@ -97,7 +97,7 @@ private struct LobbySeat: View {
                         .foregroundStyle(Theme.text)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Theme.blood, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .background(Theme.blood, in: RoundedRectangle(cornerRadius: Theme.badgeRadius, style: .continuous))
                         .padding(8)
                 }
             }

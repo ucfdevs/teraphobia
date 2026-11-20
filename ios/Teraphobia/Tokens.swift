@@ -19,10 +19,14 @@ enum Theme {
 
     // Blood red is the brand and the color of death, the same red as the website's buttons and logo.
     static let blood = Color(hex: 0xA81818)
+    // A brighter blood for a timer's last seconds: blood red is too dark to read as a thin ring on navy.
+    static let urgent = Color(hex: 0xC81E2E)
     static let moon = Color(hex: 0xEDEBD6)
     static let gold = Color(hex: 0xF5C542)
 
     // Day: dusky purple over an ember horizon. Discussion and Vote: near-black lit by a candle.
+    // Night: a deep blue sky that settles into the navy.
+    static let nightTop = Color(hex: 0x121733)
     static let duskTop = Color(hex: 0x140B24)
     static let dusk = Color(hex: 0x2A1740)
     static let ember = Color(hex: 0xE2583E)
@@ -34,6 +38,8 @@ enum Theme {
     static let werewolf = Color(hex: 0xF59E0B)
 
     static let radius: CGFloat = 14
+    // Small labels like the "You" tag. Radius 14 on something that short would turn it into a pill.
+    static let badgeRadius: CGFloat = 6
     static let borderWidth: CGFloat = 2
     // Side margin for game and account screens.
     static let gutter: CGFloat = 20

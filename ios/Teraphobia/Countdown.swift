@@ -26,10 +26,11 @@ private struct RingFace: View {
     let size: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulse = false
+    // Counts the pulses. Each new value plays the grow-and-settle keyframes once.
+    @State private var pulses = 0
 
     var body: some View {
-        let color = isFinalSeconds ? Theme.vampire : Theme.candle
+        let color = isFinalSeconds ? Theme.urgent : Theme.candle
         ZStack {
             Circle().stroke(Theme.text.opacity(0.15), lineWidth: 5)
             Circle()
@@ -47,14 +48,18 @@ private struct RingFace: View {
         .frame(width: size, height: size)
         .surface(.control)
         .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
-        .scaleEffect(pulse ? 1.12 : 1)
+        .keyframeAnimator(initialValue: 1.0, trigger: pulses) { ring, scale in
+            ring.scaleEffect(scale)
+        } keyframes: { _ in
+            CubicKeyframe(1.12, duration: 0.12)
+            CubicKeyframe(1, duration: 0.35)
+        }
         .sensoryFeedback(.impact(weight: .heavy), trigger: secondsLeft) { _, left in (1...5).contains(left) }
         .onChange(of: secondsLeft) {
             guard isFinalSeconds else { return }
             SoundEngine.shared.play(.heartbeat)
-            guard !reduceMotion else { return }
-            withAnimation(.easeOut(duration: 0.12)) { pulse = true }
-            withAnimation(.easeIn(duration: 0.35).delay(0.12)) { pulse = false }
+            // With Reduce Motion the ring still turns red and the haptic still thumps, it just doesn't grow.
+            if !reduceMotion { pulses += 1 }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(secondsLeft) seconds left")

@@ -25,6 +25,12 @@ final class SoundEngine {
     private var players: [Cue: AVAudioPlayer] = [:]
     private var sessionReady = false
 
+    // Sets up the audio session and loads every sound, before the game needs one.
+    func prepare() {
+        prepareSession()
+        for cue in Cue.allCases { _ = player(for: cue) }
+    }
+
     func play(_ cue: Cue) {
         guard !UserDefaults.standard.bool(forKey: Self.mutedKey) else { return }
         prepareSession()
@@ -33,11 +39,14 @@ final class SoundEngine {
         player.play()
     }
 
+    // Marked ready only once it works, so a failed setup is tried again on the next sound.
     private func prepareSession() {
         guard !sessionReady else { return }
-        sessionReady = true
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
-        try? AVAudioSession.sharedInstance().setActive(true)
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+            sessionReady = true
+        } catch {}
     }
 
     private func player(for cue: Cue) -> AVAudioPlayer? {
