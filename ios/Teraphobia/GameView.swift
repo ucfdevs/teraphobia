@@ -9,6 +9,9 @@ struct GameView: View {
         client.room?.seats.first { $0.seatID == client.seatID }?.lifeStatus ?? .alive
     }
 
+    // The death sting waiting to play, so it can be called off when this screen goes away.
+    @State private var deathSting: Task<Void, Never>?
+
     var body: some View {
         Group {
             if client.reconnecting {
@@ -48,16 +51,46 @@ struct GameView: View {
                 WaitingRoomView(client: client)
             }
         }
+        .environment(\.gameBackdrop, client.phase.map { Backdrop(phase: $0.phase) } ?? .plain)
+        .environment(\.phaseStartedAt, client.phaseStartedAt)
         .alert("Not allowed", isPresented: Binding(get: { client.gameError != nil }, set: { _ in client.gameError = nil })) {
             Button("OK") {}
         } message: {
             Text(client.gameError ?? "")
         }
+        // Loaded now, so the first sound doesn't wait on its file.
+        .task { SoundEngine.shared.prepare() }
         // VoiceOver doesn't read a new screen title by itself, so it says when a phase starts or the connection drops.
-        .onChange(of: client.phase) {
-            if let phase = client.phase {
-                AccessibilityNotification.Announcement(phase.phase.rawValue.capitalized).post()
+        // Keyed on the phase alone: a host pause resends the same phase with a new end time, and that isn't a new phase.
+        .onChange(of: client.phase?.phase) {
+            if let phase = client.phase?.phase {
+                AccessibilityNotification.Announcement(phase.rawValue.capitalized).post()
+                // Every phone plays these at once. A rejoin lands mid-phase, so it stays quiet.
+                if !client.phaseFromRejoin {
+                    switch phase {
+                    case .night: SoundEngine.shared.play(.nightFalls)
+                    case .morning: SoundEngine.shared.play(.dayBreaks)
+                    default: break
+                    }
+                }
             }
+        }
+        // Someone died or was banished. Late, so it lands after the morning bell.
+        .onChange(of: client.deaths) { old, new in
+            guard new > old else { return }
+            deathSting?.cancel()
+            deathSting = Task {
+                try? await Task.sleep(for: .seconds(1))
+                // Left the game, or that death ended it and the win or lose sound plays instead.
+                guard !Task.isCancelled, client.gameOver == nil else { return }
+                SoundEngine.shared.play(.death)
+            }
+        }
+        .onDisappear { deathSting?.cancel() }
+        .onChange(of: client.gameOver) {
+            guard let gameOver = client.gameOver, let you = client.you else { return }
+            let youWon = (gameOver.winner == .monster) == (you.role == .monster)
+            SoundEngine.shared.play(youWon ? .youWin : .youLose)
         }
         .onChange(of: client.reconnecting) {
             if client.reconnecting {
@@ -73,11 +106,15 @@ struct WatchScreenView: View {
     let phase: Phase
     let deadline: Date
 
+    private var heading: String {
+        phase == .morning ? "Who made it to morning?" : "All eyes on the big screen"
+    }
+
     var body: some View {
-        PhaseLayout(title: phase.rawValue.capitalized, deadline: deadline, you: you) {
-            Section {
-                Text("Watch the shared screen.")
-            }
+        // Everyone's phone is on this screen at once, so it stays neutral for the Monster too.
+        PhaseLayout(title: phase.rawValue.capitalized, deadline: deadline, you: you, heading: heading,
+                    look: ScreenLook(you: you, moment: .watchingSharedScreen)) {
+            StrangerSays(text: "Watch the shared screen. Whatever crept through the night, the news is up there.")
         }
     }
 }

@@ -10,40 +10,41 @@ struct NightView: View {
     let powerUsed: Bool
     let send: (NightSubmit) -> Void
 
-    @State private var picked: [String] = []
+    @State private var picks: NightPicks?
 
-    // The Werewolf can kill two players once per game, never on Night 1.
-    private var maxPicks: Int {
-        you.monsterType == .werewolf && !powerUsed && round > 1 ? 2 : 1
+    private var current: NightPicks {
+        picks ?? NightPicks(you: you, round: round, powerUsed: powerUsed)
     }
 
     private var header: String {
         if you.role == .villager { return "Who do you suspect?" }
-        return maxPicks == 2 ? "Pick one or two victims" : "Pick a victim"
+        return current.maxPicks == 2 ? "Pick one or two victims" : "Pick a victim"
+    }
+
+    // The rule in plain words.
+    private var hint: String {
+        if you.role == .villager {
+            return "Tap the player you think is the Monster. Your hunch stays secret, and you can change it until Night ends."
+        }
+        if current.maxPicks == 2 {
+            return "Tap one or two players to kill tonight. You can change your picks until Night ends."
+        }
+        return "Tap the player you want to kill tonight. You can change your pick until Night ends."
     }
 
     var body: some View {
-        PhaseLayout(title: "Night \(round)", deadline: deadline, you: you) {
-            PlayerPicker(header: header, seats: seats, you: you, picked: picked, onPick: pick)
+        // Only the Monster's phone is choosing a victim, so only it gets its type's look. Villagers stay neutral.
+        PhaseLayout(title: "Night \(round)", deadline: deadline, you: you, heading: "The village sleeps",
+                    look: ScreenLook(you: you, moment: .choosingVictim)) {
+            StrangerSays(text: hint)
+            PlayerPicker(header: header, seats: seats, you: you, picked: current.picked, onPick: pick)
         }
     }
 
     private func pick(_ seatID: String) {
-        if maxPicks == 1 {
-            picked = [seatID]
-        } else if picked.contains(seatID) {
-            // A pick can't be taken back, so keep at least one.
-            if picked.count > 1 { picked.removeAll { $0 == seatID } }
-        } else {
-            picked.append(seatID)
-            if picked.count > 2 { picked.removeFirst() }
-        }
-
-        if you.role == .monster {
-            send(NightSubmit(victimIDS: picked, suspectID: nil))
-        } else {
-            send(NightSubmit(victimIDS: nil, suspectID: seatID))
-        }
+        let next = current.tapping(seatID)
+        picks = next
+        send(next.submit)
     }
 }
 

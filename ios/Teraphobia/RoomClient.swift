@@ -24,6 +24,10 @@ final class RoomClient {
     var you: YouRole?
     var phase: PhaseStart?
     var phaseDeadline = Date()
+    // When this phase began on the phone, so the countdown ring knows how full to be.
+    var phaseStartedAt: Date?
+    // True when the phase came back from a rejoin rather than starting, so its sound doesn't play again.
+    var phaseFromRejoin = false
     var result: YouResult?
     var powerUsed = false
     var nightVictims = 0
@@ -35,9 +39,24 @@ final class RoomClient {
     var votedRound: Int?
     var votedTargetID: String?
 
+    // Goes up each time someone dies or is banished while this phone watches, for the death sting.
+    var deaths = 0
+
     private var manager: SocketManager?
     // From you:joined. Sent back in room:join after a drop to get the same seat.
     private var rejoinToken: String?
+    // The full length of each phase, seen at its phase:start. A rejoin or a resume only gets the time left,
+    // so it uses these to find the start.
+    private var phaseLengths: [Phase: TimeInterval] = [:]
+
+    // Where the ring starts: a full phase length before the deadline. Without one, the ring starts full from now.
+    private func startOfPhase(_ phase: Phase) -> Date {
+        phaseLengths[phase].map { phaseDeadline.addingTimeInterval(-$0) } ?? Date()
+    }
+
+    private static func outCount(_ room: RoomState?) -> Int {
+        room?.seats.filter { $0.lifeStatus != .alive }.count ?? 0
+    }
 
     func join(code: String, displayName: String, accessToken: String? = nil) async {
         roomError = nil
@@ -63,6 +82,10 @@ final class RoomClient {
         seatID = nil
         you = nil
         phase = nil
+        phaseStartedAt = nil
+        phaseFromRejoin = false
+        phaseLengths = [:]
+        deaths = 0
         result = nil
         powerUsed = false
         nightVictims = 0
@@ -124,21 +147,35 @@ final class RoomClient {
             joined = true
         }
         socket.on("room:state") { [weak self] data, _ in
-            self?.room = Self.decode(RoomState.self, data)
+            guard let self else { return }
+            let next = Self.decode(RoomState.self, data)
+            // While reconnecting, the room catches up on deaths we missed. Those don't count as happening now.
+            if !reconnecting, Self.outCount(next) > Self.outCount(room) { deaths += 1 }
+            room = next
         }
         socket.on("you:role") { [weak self] data, _ in
             self?.you = Self.decode(YouRole.self, data)
         }
         socket.on("phase:start") { [weak self] data, _ in
             guard let self, let next = Self.decode(PhaseStart.self, data) else { return }
-            // The Werewolf's double kill is used up once a night with two victims ends.
-            if next.phase == .morning {
-                if nightVictims == 2 { powerUsed = true }
-                nightVictims = 0
+            // The phone's clock can differ from the server's, so only the time left is used.
+            let timeLeft = Double(next.endsAt - next.serverNow) / 1000
+            phaseDeadline = Date().addingTimeInterval(timeLeft)
+            // Phases never repeat back to back, so the same phase and round again means the host's screen
+            // paused and came back with the time it had left. The ring keeps its place and nothing replays.
+            if next.phase == phase?.phase, next.round == phase?.round {
+                phaseStartedAt = startOfPhase(next.phase)
+            } else {
+                // The Werewolf's double kill is used up once a night with two victims ends.
+                if next.phase == .morning {
+                    if nightVictims == 2 { powerUsed = true }
+                    nightVictims = 0
+                }
+                phaseStartedAt = Date()
+                phaseLengths[next.phase] = timeLeft
+                phaseFromRejoin = false
             }
             phase = next
-            // The phone's clock can differ from the server's, so only the time left is used.
-            phaseDeadline = Date().addingTimeInterval(Double(next.endsAt - next.serverNow) / 1000)
             gameError = nil
         }
         socket.on("you:result") { [weak self] data, _ in
@@ -151,9 +188,11 @@ final class RoomClient {
             guard let self, let state = Self.decode(YouRejoined.self, data) else { return }
             room = state.room
             you = state.you
+            phaseFromRejoin = true
             phase = state.phase
             if let next = state.phase {
                 phaseDeadline = Date().addingTimeInterval(Double(next.endsAt - next.serverNow) / 1000)
+                phaseStartedAt = startOfPhase(next.phase)
             }
             result = state.results.last
             if let used = state.powerUsed { powerUsed = used }

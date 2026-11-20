@@ -1,7 +1,8 @@
 import SwiftUI
 
-// Villagers pick Search, Commune, or Candle. The Monster sees the same three buttons as cover
+// Villagers pick Search, Commune, or Candle. The Monster sees the same three cards as cover
 // (they send nothing), a rotating flavor message, and its power button until it's used.
+// Every card looks and sounds the same for every role, so a glance at the Monster's phone gives nothing away.
 struct DayView: View {
     let you: YouRole
     let seats: [PublicSeat]
@@ -15,6 +16,8 @@ struct DayView: View {
     @State private var candleTarget: String?
     @State private var choosingPowerTarget = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private var isMonster: Bool { you.role == .monster }
 
     // Vampire and Witch powers are used during Day. The Werewolf's is at Night.
@@ -22,48 +25,80 @@ struct DayView: View {
         isMonster && you.monsterType != .werewolf && !powerUsed
     }
 
+    // Choosing a power target is a Monster-only moment, so only then does the screen take the Monster look.
+    private var look: ScreenLook {
+        showPower && choosingPowerTarget ? ScreenLook(you: you, moment: .usingPower) : .neutral
+    }
+
     var body: some View {
-        PhaseLayout(title: "Day \(round)", deadline: deadline, you: you) {
-            Section("Pick one") {
-                actionButton(.search, "Search the crime scene", icon: "magnifyingglass")
-                actionButton(.commune, "Commune with the dead", icon: "moon.stars")
-                actionButton(.candle, "Light a candle", icon: "flame")
+        PhaseLayout(title: "Day \(round)", deadline: deadline, you: you, heading: "Daylight, for now", look: look) {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeading("Pick one")
+                // Not in a GlassGroup: inside one, the selected card's orange border blends into the glass and disappears.
+                actionCard(.search, "Search the crime scene", detail: "Learn one thing the Monster wears or carries.",
+                           icon: "magnifyingglass")
+                actionCard(.commune, "Commune with the dead", detail: "Learn one thing the Monster doesn't have.",
+                           icon: "moon.stars")
+                actionCard(.candle, "Light a candle", detail: "Protect another player from tonight's kill.",
+                           icon: "flame.fill")
             }
 
             if action == .candle {
                 PlayerPicker(header: "Protect who tonight?", seats: seats, you: you,
                              picked: candleTarget.map { [$0] } ?? [], onPick: lightCandle)
+                    .transition(.opacity)
             }
 
-            Section {
+            // The same card in the same spot for both roles.
+            NoteCard {
+                Image(systemName: "hourglass")
+                    .font(.title2)
+                    .foregroundStyle(Theme.moon)
+            } content: {
                 if isMonster {
                     FlavorMessage()
                 } else {
-                    Text(action == nil ? "Your result comes when Day ends." : "Locked in. Your result comes when Day ends.")
+                    Text(lockedIn ? "Locked in. Your result comes when Day ends." : "Your result comes when Day ends.")
                 }
             }
 
             if showPower {
                 if choosingPowerTarget {
-                    PlayerPicker(header: powerTitle, seats: seats, you: you, picked: [], onPick: { seatID in
-                        usePower(PowerUse(targetID: seatID))
-                        choosingPowerTarget = false
-                    })
-                } else {
-                    Section {
-                        Button(powerTitle) { choosingPowerTarget = true }
+                    VStack(alignment: .leading, spacing: 12) {
+                        PlayerPicker(header: powerTitle, seats: seats, you: you, picked: [], onPick: { seatID in
+                            usePower(PowerUse(targetID: seatID))
+                            choosingPowerTarget = false
+                        })
+                        Button("Not now") { choosingPowerTarget = false }
+                            .buttonStyle(.quiet)
                     }
+                    .transition(.opacity)
+                } else {
+                    Button(powerTitle) { choosingPowerTarget = true }
+                        .buttonStyle(.quiet)
                 }
             }
         }
+        .animation(reduceMotion ? nil : .spring(duration: 0.35), value: action)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: choosingPowerTarget)
+    }
+
+    // A Candle only counts once it has someone to protect.
+    private var lockedIn: Bool {
+        guard let action else { return false }
+        return action != .candle || candleTarget != nil
     }
 
     private var powerTitle: String {
         you.monsterType == .vampire ? "Block a player's action" : "Plant a fake clue"
     }
 
-    private func actionButton(_ value: DayAction, _ title: String, icon: String) -> some View {
-        Button {
+    private func actionCard(_ value: DayAction, _ title: String, detail: String, icon: String) -> some View {
+        let selected = action == value
+        let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+        return Button {
+            // Same sound for every role, before anything role-specific happens.
+            SoundEngine.shared.play(.pick)
             action = value
             candleTarget = nil
             // A Candle is only sent once it has a target.
@@ -71,18 +106,45 @@ struct DayView: View {
                 sendAction(DaySubmit(action: value, targetID: nil))
             }
         } label: {
-            HStack {
-                Label(title, systemImage: icon)
-                    .foregroundStyle(.primary)
-                Spacer()
-                if action == value {
-                    // The Selected trait already says this, so VoiceOver doesn't read "checkmark" too.
-                    Image(systemName: "checkmark")
-                        .accessibilityHidden(true)
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(selected ? Theme.candle : Theme.moon)
+                    .frame(width: 32)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(Theme.text)
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.mutedText)
                 }
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                ZStack {
+                    if selected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(Theme.onCandle, Theme.candle)
+                            .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
+                    }
+                }
+                .frame(width: 28)
             }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .surface(.card, selected: selected, interactive: true)
+            .contentShape(shape)
+            .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.4), value: selected)
         }
-        .accessibilityAddTraits(action == value ? .isSelected : [])
+        .buttonStyle(CardPressStyle())
+        .sensoryFeedback(.selection, trigger: selected)
+        // The icons and checkmark are decoration; the Selected trait says it's picked.
+        .accessibilityLabel(title)
+        .accessibilityHint(detail)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func lightCandle(_ seatID: String) {
@@ -107,25 +169,60 @@ struct FlavorMessage: View {
     }
 }
 
-// The private Day result, shown during Discussion. The Monster sees a flavor message in the same spot.
+// A short private note on a card: art on the left, words on the right. The Villager's and the Monster's
+// versions use this same card, so the two screens look alike from across the table.
+private struct NoteCard<Art: View, Content: View>: View {
+    var artWidth: CGFloat = 32
+    @ViewBuilder let art: Art
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 14) {
+            art
+                .frame(width: artWidth)
+                .accessibilityHidden(true)
+            content
+                .font(.headline)
+                .foregroundStyle(Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .surface(.card)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// The private Day result, shown during Discussion. The Monster sees a flavor message in the same card.
 struct ResultView: View {
     let you: YouRole
     let round: Int
     let deadline: Date
     let result: YouResult?
 
+    private let spriteSize: CGFloat = 96
+
     var body: some View {
-        PhaseLayout(title: "Discussion", deadline: deadline, you: you) {
-            Section("Your clue") {
-                if you.role == .monster {
-                    FlavorMessage()
-                } else {
-                    HStack(spacing: 12) {
-                        if let clueTrait {
-                            TraitView(trait: clueTrait)
-                        }
-                        Text(text)
+        PhaseLayout(title: "Discussion", deadline: deadline, you: you, heading: "Who's lying?") {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeading("Your clue")
+                NoteCard(artWidth: spriteSize) {
+                    // The Stranger fills the spot when there's no trait to show, so every card has the same shape.
+                    if you.role != .monster, let clueTrait {
+                        TraitView(trait: clueTrait, size: spriteSize, boxed: false)
+                    } else {
+                        StrangerView(size: spriteSize)
                     }
+                } content: {
+                    Group {
+                        if you.role == .monster {
+                            FlavorMessage()
+                        } else {
+                            Text(ClueText(result: result, round: round).text)
+                        }
+                    }
+                    .font(.display(.title3))
                 }
             }
         }
@@ -135,20 +232,6 @@ struct ResultView: View {
     private var clueTrait: Trait? {
         guard let result, result.round == round else { return nil }
         return result.trait
-    }
-
-    private var text: String {
-        guard let result, result.round == round else { return "You didn't pick an action today." }
-        switch result.action {
-        case .search:
-            guard let trait = result.trait else { return "You found nothing" }
-            return "The Monster has \(trait.slot.rawValue) \(trait.option.rawValue)"
-        case .commune:
-            guard let trait = result.trait else { return "The dead are silent" }
-            return "The Monster doesn't have \(trait.slot.rawValue) \(trait.option.rawValue)"
-        case .candle:
-            return result.candleBlocked == true ? "The Monster blocked your candle" : "Your candle is lit for tonight"
-        }
     }
 }
 

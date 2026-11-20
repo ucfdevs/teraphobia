@@ -1,43 +1,83 @@
 import SwiftUI
 
-// Every in-game screen uses this layout, so a Villager's phone and the Monster's
-// phone look the same from across the room.
+// Every in-game screen uses this layout: the phase's backdrop, a big heading with the countdown ring,
+// the role card, your costume, then the screen's own content. Day, Discussion and Vote stay neutral for
+// everyone; only Monster-only moments pass a Monster look (see ScreenLook).
 struct PhaseLayout<Content: View>: View {
     let title: String
     let deadline: Date
     let you: YouRole
+    // The big heading under the bar. Defaults to the title.
+    var heading: String?
+    var look: ScreenLook = .neutral
     @ViewBuilder let content: Content
 
+    @Environment(\.gameBackdrop) private var backdrop
+    @Environment(\.phaseStartedAt) private var phaseStartedAt
+
     var body: some View {
-        List {
-            Section {
-                RolePeek(you: you)
-            }
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-
-            // Costumes are public, so everyone can see and talk about their own.
-            Section("Your costume") {
-                HStack(spacing: 12) {
-                    CostumeView(costume: you.costume, size: 64)
-                        .accessibilityHidden(true)
-                    Text(costumeName(you.costume).capitalized)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .center, spacing: 12) {
+                    Text(heading ?? title)
+                        .font(.display(.largeTitle))
+                        .foregroundStyle(Theme.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Countdown(deadline: deadline, startedAt: phaseStartedAt, size: 72)
                 }
-            }
 
-            content
+                RolePeek(you: you)
+
+                YourCostume(costume: you.costume)
+
+                content
+            }
+            .padding(.horizontal, Theme.gutter)
+            .padding(.top, 8)
+            .padding(.bottom, 32)
         }
+        .gameBackground(backdrop, look: look)
+        // The bar keeps the phase name (VoiceOver and the UI tests find the screen by it), drawn over the sky.
         .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Countdown(deadline: deadline)
+                MuteButton()
             }
         }
     }
 }
 
-// Living players other than you. Used for Night picks, the Candle, and the Monster's power.
+// Costumes are public, so everyone can see and talk about their own. Shown big on every game screen.
+struct YourCostume: View {
+    let costume: Costume
+
+    var body: some View {
+        HStack(spacing: 14) {
+            CostumeView(costume: costume, size: 96, boxed: false)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Your costume")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.mutedText)
+                Text(costumeName(costume).capitalized)
+                    .font(.headline)
+                    .foregroundStyle(Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .surface(.card)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// Living players other than you, as costume cards. Used for Night picks, the Candle, the Monster's power and the vote.
 struct PlayerPicker: View {
     let header: String
     let seats: [PublicSeat]
@@ -46,28 +86,33 @@ struct PlayerPicker: View {
     let onPick: (String) -> Void
 
     var body: some View {
-        Section(header) {
-            ForEach(seats.filter { $0.lifeStatus == .alive && $0.seatID != you.seatID }, id: \.seatID) { seat in
-                Button {
-                    onPick(seat.seatID)
-                } label: {
-                    HStack {
-                        if let costume = seat.costume {
-                            CostumeView(costume: costume)
-                        }
-                        Text(seat.displayName)
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        if picked.contains(seat.seatID) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                .accessibilityLabel(seat.costume.map { "\(seat.displayName), \(costumeName($0))" } ?? seat.displayName)
-                .accessibilityAddTraits(picked.contains(seat.seatID) ? .isSelected : [])
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeading(header)
+            CostumeGrid(seats: seats.filter { $0.lifeStatus == .alive && $0.seatID != you.seatID },
+                        picked: picked, onPick: onPick)
         }
     }
+}
+
+// Set once by GameView for the current phase, read by PhaseLayout.
+extension EnvironmentValues {
+    var gameBackdrop: Backdrop {
+        get { self[GameBackdropKey.self] }
+        set { self[GameBackdropKey.self] = newValue }
+    }
+
+    var phaseStartedAt: Date? {
+        get { self[PhaseStartedAtKey.self] }
+        set { self[PhaseStartedAtKey.self] = newValue }
+    }
+}
+
+private struct GameBackdropKey: EnvironmentKey {
+    static let defaultValue = Backdrop.night
+}
+
+private struct PhaseStartedAtKey: EnvironmentKey {
+    static let defaultValue: Date? = nil
 }
 
 // Sample players for the Night and Day previews.
