@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // Picks the game screen from the current phase. Until the game starts it shows the Waiting room.
 struct GameView: View {
@@ -11,6 +12,8 @@ struct GameView: View {
 
     // The death sting waiting to play, so it can be called off when this screen goes away.
     @State private var deathSting: Task<Void, Never>?
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var wasInBackground = false
 
     var body: some View {
         Group {
@@ -86,7 +89,20 @@ struct GameView: View {
                 SoundEngine.shared.play(.death)
             }
         }
-        .onDisappear { deathSting?.cancel() }
+        // An auto-locked phone drops its socket, so the screen stays on until the player leaves the game.
+        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onDisappear {
+            deathSting?.cancel()
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        // Only after the background, not when Control Center or a call banner briefly covers the app.
+        .onChange(of: scenePhase) {
+            if scenePhase == .background { wasInBackground = true }
+            if scenePhase == .active, wasInBackground {
+                wasInBackground = false
+                client.reconnectNow()
+            }
+        }
         .onChange(of: client.gameOver) {
             guard let gameOver = client.gameOver, let you = client.you else { return }
             let youWon = (gameOver.winner == .monster) == (you.role == .monster)

@@ -71,6 +71,26 @@ final class RoomClient {
         connect(code: code, displayName: displayName, accessToken: accessToken)
     }
 
+    // At launch, takes back the seat this phone had when iOS closed the app (#112). True when there was one to try.
+    func resume(accessToken: String?) -> Bool {
+        guard let seat = Self.savedSeat() else { return false }
+        rejoinToken = seat.rejoinToken
+        isJoining = true
+        reconnecting = true
+        connect(code: seat.code, displayName: seat.displayName, accessToken: accessToken)
+        return true
+    }
+
+    // Back from the background. A locked phone can wake up holding a socket the server already dropped, which
+    // still says connected until its ping check runs out, so a game in progress always reconnects now.
+    func reconnectNow() {
+        guard let manager else { return }
+        // Before Start the server frees a dropped seat, so the lobby only retries a socket that's already gone.
+        if you == nil, manager.defaultSocket.status == .connected { return }
+        reconnecting = true
+        manager.reconnect()
+    }
+
     func leave() {
         // Handlers go first, so our own disconnect isn't shown as an error.
         manager?.defaultSocket.removeAllHandlers()
@@ -95,6 +115,27 @@ final class RoomClient {
         votedRound = nil
         votedTargetID = nil
         rejoinToken = nil
+        Self.clearSeat()
+    }
+
+    // What a closed app needs to get its seat back. In the Keychain, so it survives iOS ending the app.
+    struct SavedSeat: Codable, Equatable {
+        let code: String
+        let displayName: String
+        let rejoinToken: String
+    }
+
+    static func saveSeat(_ seat: SavedSeat) {
+        guard let data = try? JSONEncoder().encode(seat) else { return }
+        Keychain.save(data, account: "seat")
+    }
+
+    static func savedSeat() -> SavedSeat? {
+        Keychain.load(account: "seat").flatMap { try? JSONDecoder().decode(SavedSeat.self, from: $0) }
+    }
+
+    static func clearSeat() {
+        Keychain.delete(account: "seat")
     }
 
     func emit(_ event: String, _ value: some Encodable) {
@@ -143,6 +184,7 @@ final class RoomClient {
             guard let self, let you = Self.decode(YouJoined.self, data) else { return }
             seatID = you.seatID
             rejoinToken = you.rejoinToken
+            Self.saveSeat(SavedSeat(code: code, displayName: displayName, rejoinToken: you.rejoinToken))
             isJoining = false
             joined = true
         }
@@ -200,6 +242,8 @@ final class RoomClient {
         }
         socket.on("game:over") { [weak self] data, _ in
             self?.gameOver = Self.decode(GameOver.self, data)
+            // The server deletes the room once the game ends, so there's no seat left to come back to.
+            Self.clearSeat()
         }
         socket.on("error") { [weak self] data, _ in
             guard let self else { return }
@@ -207,7 +251,8 @@ final class RoomClient {
             // Failed retries arrive here as plain strings and are ignored. A refused rejoin ends the session.
             if reconnecting {
                 guard serverError != nil else { return }
-                roomError = "Lost connection to the room"
+                // Refused at launch means that game already ended, so the Join screen stays quiet.
+                if joined { roomError = "Lost connection to the room" }
                 leave()
                 return
             }
