@@ -33,6 +33,13 @@ struct SignInView: View {
     @FocusState private var focusedField: Field?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    // Forgot password opens the web page (#39). In the Simulator the web app runs on this Mac on Vite's port.
+    #if targetEnvironment(simulator)
+    private static let forgotPasswordURL = URL(string: "http://localhost:5173/forgot-password")!
+    #else
+    private static let forgotPasswordURL = URL(string: "https://teraphobia.com/forgot-password")!
+    #endif
+
     private var trimmedEmail: String {
         email.trimmingCharacters(in: .whitespaces)
     }
@@ -145,6 +152,11 @@ struct SignInView: View {
                 .buttonStyle(.candle)
                 .disabled(!canSubmit || auth.isWorking)
                 .padding(.top, 4)
+
+            if mode == .signIn {
+                Link("Forgot password?", destination: Self.forgotPasswordURL)
+                    .buttonStyle(.quiet)
+            }
 
             // One button for both modes: the server creates the account on the first Google sign in.
             Button("Sign in with Google") {

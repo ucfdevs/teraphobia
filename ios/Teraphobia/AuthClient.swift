@@ -83,6 +83,20 @@ final class AuthClient {
         save(next)
     }
 
+    // FR-3. The server ends every other session and answers with a new one for this phone.
+    // Returns the message to show, or nil once the password changed.
+    func changePassword(current: String, new: String) async -> String? {
+        let body = ["currentPassword": current, "newPassword": new]
+        guard let response = try? await send("POST", "auth/change-password", body: body) else {
+            return "Can't reach the server"
+        }
+        if response.status < 300, let next = try? JSONDecoder().decode(Session.self, from: response.data) {
+            save(next)
+            return nil
+        }
+        return (try? JSONDecoder().decode(AuthError.self, from: response.data))?.error ?? "Something went wrong"
+    }
+
     private func start(_ path: String, _ body: [String: String]) async {
         error = nil
         isWorking = true
