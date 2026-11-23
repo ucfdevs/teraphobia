@@ -23,10 +23,6 @@ export function sharedTraits(a: Costume, b: Costume) {
   return SLOTS.filter((slot) => a[slot] === b[slot]).length
 }
 
-function randomCostume(rng: Rng): Costume {
-  return { hat: pick(rng, OPTIONS.hat), mask: pick(rng, OPTIONS.mask), item: pick(rng, OPTIONS.item) }
-}
-
 // The 9 costumes that differ from this one in exactly one slot.
 export function lookalikes(costume: Costume): Costume[] {
   return SLOTS.flatMap((slot) => OPTIONS[slot].filter((o) => o !== costume[slot]).map((option) => ({ ...costume, [slot]: option })))
@@ -38,36 +34,68 @@ export function isFairDeal(costumes: Costume[]) {
   return costumes.every((c, i) => costumes.some((other, j) => i !== j && sharedTraits(c, other) === 2))
 }
 
-function tryDeal(count: number, rng: Rng): Costume[] {
+// Most players who may wear any one option in a slot, so no trait points at most of the room.
+export function optionCap(count: number) {
+  return Math.ceil(count / 2)
+}
+
+const ALL_COSTUMES: Costume[] = OPTIONS.hat.flatMap((hat) =>
+  OPTIONS.mask.flatMap((mask) => OPTIONS.item.map((item) => ({ hat, mask, item }))),
+)
+
+// One attempt at a deal, or null if it painted itself into a corner (the caller retries).
+function tryDeal(count: number, rng: Rng): Costume[] | null {
   const dealt: Costume[] = []
   const used = new Set<string>()
-  const unusedLookalikes = (c: Costume) => lookalikes(c).filter((l) => !used.has(key(l)))
+  const worn = Object.fromEntries(SLOTS.map((slot) => [slot, new Map<string, number>()])) as Record<Slot, Map<string, number>>
+  const cap = optionCap(count)
+
+  const fits = (c: Costume) => !used.has(key(c)) && SLOTS.every((slot) => (worn[slot].get(c[slot]) ?? 0) < cap)
+  // Options nobody wears yet make a costume more attractive.
+  const fresh = (c: Costume) => SLOTS.filter((slot) => !worn[slot].has(c[slot])).length
+  // A random candidate among those with the most fresh options.
+  const choose = (candidates: Costume[]) => {
+    const allowed = candidates.filter(fits)
+    if (allowed.length === 0) return null
+    const best = Math.max(...allowed.map(fresh))
+    return pick(rng, allowed.filter((c) => fresh(c) === best))
+  }
 
   while (dealt.length < count) {
     const lonely = dealt.filter((c) => !dealt.some((o) => o !== c && sharedTraits(c, o) === 2))
-    let next: Costume | undefined
+    let next: Costume | null
     if (lonely.length > 0) {
       // Give the newest lonely costume a lookalike first.
-      next = pick(rng, unusedLookalikes(lonely[lonely.length - 1]))
+      next = choose(lookalikes(lonely[lonely.length - 1]))
     } else if (dealt.length === 0 || (count - dealt.length >= 2 && rng() < 0.5)) {
       // Start a new lookalike group, only while there is room to finish it.
-      next = randomCostume(rng)
+      next = choose(ALL_COSTUMES)
     } else {
-      const options = dealt.flatMap(unusedLookalikes)
-      next = options[randomIndex(rng, options.length)]
+      next = choose(dealt.flatMap(lookalikes))
     }
-    if (!next || used.has(key(next))) continue
+    if (!next) return null
     used.add(key(next))
+    for (const slot of SLOTS) worn[slot].set(next[slot], (worn[slot].get(next[slot]) ?? 0) + 1)
     dealt.push(next)
   }
   return dealt
 }
 
+// Every costume is unique and has a lookalike, and no option is worn by more than optionCap players.
+export function isSpreadDeal(costumes: Costume[]) {
+  const cap = optionCap(costumes.length)
+  return SLOTS.every((slot) => {
+    const counts = new Map<string, number>()
+    for (const c of costumes) counts.set(c[slot], (counts.get(c[slot]) ?? 0) + 1)
+    return Math.max(...counts.values()) <= cap
+  })
+}
+
 // Deals `count` costumes in random order.
 export function dealCostumes(count: number, rng: Rng): Costume[] {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
     const costumes = tryDeal(count, rng)
-    if (isFairDeal(costumes)) return shuffle(rng, costumes)
+    if (costumes && isFairDeal(costumes) && isSpreadDeal(costumes)) return shuffle(rng, costumes)
   }
   throw new Error(`Could not deal ${count} fair costumes`)
 }
