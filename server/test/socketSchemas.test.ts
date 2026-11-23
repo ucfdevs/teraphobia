@@ -77,7 +77,7 @@ describe('socket schemas', () => {
     ['night:submit', { victimIds: ['s1', 's2', 's3'] }],
     ['night:submit', { victimIds: ['s1', 's1'] }],
     ['night:submit', { victimIds: ['s1'], suspectId: 's2' }],
-    ['power:use', {}],
+    ['power:use', { targetId: 5 }],
     ['vote:submit', {}],
     ['vote:submit', { targetId: 7 }],
   ]

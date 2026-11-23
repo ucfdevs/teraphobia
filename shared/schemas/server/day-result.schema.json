@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DayResult",
+  "description": "Server to all, event `day:result`. Sent when Day ends: the action the village voted for, shown on the shared screen. A Candle's target is never named. A Search names who searched; only that phone gets the trait (`you:result`).",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../common.schema.json#/definitions/Round"
+    },
+    "action": {
+      "description": "The ballot winner, or none when nobody voted.",
+      "type": "string",
+      "enum": [
+        "search",
+        "commune",
+        "candle",
+        "none"
+      ]
+    },
+    "blocked": {
+      "description": "True when the Vampire blocked today's action.",
+      "type": "boolean"
+    },
+    "searcherId": {
+      "description": "Search only, when not blocked: the Villager who searched.",
+      "$ref": "../common.schema.json#/definitions/SeatId"
+    },
+    "trait": {
+      "description": "Commune only, when not blocked: a trait the Monster does not have.",
+      "$ref": "../common.schema.json#/definitions/Trait"
+    }
+  },
+  "required": [
+    "round",
+    "action",
+    "blocked"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "search"
+          },
+          "blocked": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "searcherId"
+        ],
+        "not": {
+          "required": [
+            "trait"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "const": "commune"
+          },
+          "blocked": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "trait"
+        ],
+        "not": {
+          "required": [
+            "searcherId"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "action": {
+                "enum": [
+                  "candle",
+                  "none"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "blocked": {
+                "const": true
+              }
+            }
+          }
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "not": {
+              "required": [
+                "trait"
+              ]
+            }
+          },
+          {
+            "not": {
+              "required": [
+                "searcherId"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

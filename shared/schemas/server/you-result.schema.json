@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "YouResult",
-  "description": "Server to one, event `you:result`. Private result of the player's Day action, sent when Day ends. Blocked and faked results look exactly like normal ones. Client text: Search null = \"You found nothing\", Commune null = \"The dead are silent\", Candle blocked = \"The Monster blocked your candle\".",
+  "description": "Server to one, event `you:result`. Sent at Day end only to the Villager who searched for the village: one trait the Monster wears (the Witch's fake looks the same). Commune and Candle results are public in `day:result`; the commune and candle shapes stay only so older phones still decode.",
   "type": "object",
   "properties": {
     "round": { "$ref": "../common.schema.json#/definitions/Round" },

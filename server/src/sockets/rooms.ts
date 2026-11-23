@@ -73,6 +73,9 @@ function youRejoined(room: Room, seatId: string) {
     you,
     results: game?.results.get(seatId) ?? [],
     lastCandleTargetId: game?.lastCandleTarget.get(seatId) ?? null,
+    // Today's ballot while it's Day, and the latest village action.
+    dayOptions: game && game.phase === 'day' && !game.over ? game.dayOptions() : null,
+    dayResult: game?.lastDayOutcome ?? null,
     ...(you?.role === 'monster' ? { powerUsed: game!.powerUsed } : {}),
   }
 }

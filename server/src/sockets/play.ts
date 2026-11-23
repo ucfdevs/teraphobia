@@ -27,7 +27,13 @@ function handle<T>(socket: Socket, event: ClientEvent, act: (payload: T, seatId:
 
 export function registerPlay(socket: Socket) {
   handle<NightSubmit>(socket, 'night:submit', (payload, seatId, room) => room.game!.submitNight(seatId, payload))
-  handle<DaySubmit>(socket, 'day:submit', (payload, seatId, room) => room.game!.submitDay(seatId, payload))
+  handle<DaySubmit>(socket, 'day:submit', (payload, seatId, room) => {
+    const rejection = room.game!.submitDay(seatId, payload)
+    // Everyone sees how many have voted, never what.
+    if (!rejection) room.runner?.send([{ to: 'room', event: 'day:progress', payload: room.game!.dayProgress() }])
+    return rejection
+  })
   handle<{ targetId: string | null }>(socket, 'vote:submit', ({ targetId }, seatId, room) => room.game!.submitVote(seatId, targetId))
-  handle<{ targetId: string }>(socket, 'power:use', ({ targetId }, seatId, room) => room.game!.usePower(seatId, targetId))
+  // power:use takes no target now; an old client's targetId is ignored.
+  handle(socket, 'power:use', (_payload, seatId, room) => room.game!.usePower(seatId))
 }

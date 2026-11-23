@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "DaySubmit",
-  "description": "Client to server, event `day:submit`. A living Villager picks one private Day action. Candle needs a target; Search and Commune take none.",
+  "description": "Client to server, event `day:submit`. Every living player, the Monster included, casts one ballot for the village's Day action; the last ballot counts. Candle needs a target; Search and Commune take none.",
   "type": "object",
   "properties": {
     "action": {
@@ -9,7 +9,7 @@
       "enum": ["search", "commune", "candle"]
     },
     "targetId": {
-      "description": "Candle only. The player to protect tonight. Not yourself, and not the same player two nights in a row (checked by the server).",
+      "description": "Candle only. The player the voter wants protected tonight. Can't be the player the Candle protected last night (checked by the server).",
       "$ref": "../common.schema.json#/definitions/SeatId"
     }
   },

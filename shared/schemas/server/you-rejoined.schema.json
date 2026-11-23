@@ -20,13 +20,27 @@
       ]
     },
     "results": {
-      "description": "Every private Day result this player has received, oldest first.",
+      "description": "Every private Search result this player has received, oldest first.",
       "type": "array",
       "items": { "$ref": "you-result.schema.json" }
     },
     "lastCandleTargetId": {
-      "description": "Who this player lit a candle for last Day, so the phone can grey them out tonight. Null if none.",
+      "description": "Who this player voted to protect on the last Day they voted Candle. Null if none.",
       "$ref": "../common.schema.json#/definitions/NullableSeatId"
+    },
+    "dayOptions": {
+      "description": "Today's ballot while it is Day; null otherwise.",
+      "anyOf": [
+        { "$ref": "day-options.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "dayResult": {
+      "description": "The latest village Day action; null before the first Day ends.",
+      "anyOf": [
+        { "$ref": "day-result.schema.json" },
+        { "type": "null" }
+      ]
     },
     "powerUsed": {
       "description": "Monster only. True once the Monster's power is spent, so the button stays hidden.",

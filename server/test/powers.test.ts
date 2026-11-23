@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { GameEngine } from '../src/game/engine.js'
+import type { GameEngine, Outbound } from '../src/game/engine.js'
 import { seededRandom } from '../src/game/random.js'
 import { signAccessToken } from '../src/lib/session.js'
 import { clearRooms, createRoom, getRoom } from '../src/rooms/store.js'
@@ -7,99 +7,107 @@ import { advanceTo, engineWith, eventsNamed, villagerIds } from './engineHelpers
 import { ManualClock, startGame, startSocketServer } from './socketHelpers.js'
 import type { SocketHarness } from './socketHelpers.js'
 
-// The keys and value types of a result, so blocked/faked results can be compared with normal ones.
-function shape(result: Record<string, unknown>) {
-  return Object.entries(result)
-    .map(([k, v]) => `${k}:${v === null ? 'null' : typeof v === 'object' ? Object.keys(v as object).sort().join('+') : typeof v}`)
-    .sort()
-    .join(',')
-}
-
 function monsterHas(game: GameEngine, trait: { slot: 'hat' | 'mask' | 'item'; option: string }) {
   return game.player(game.monsterSeatId)!.costume[trait.slot] === trait.option
+}
+
+const dayResult = (events: Outbound[]) => eventsNamed(events, 'day:result')[0]
+const powerState = (events: Outbound[]) => eventsNamed(events, 'you:power')[0]
+
+// Moves to Day, has one Villager vote for the action, and the Monster use its power.
+function dayWithPower(type: 'vampire' | 'witch', action: 'search' | 'commune' | 'candle', seed = 1) {
+  const game = engineWith(5, type, seed)
+  const [voter, other] = villagerIds(game)
+  advanceTo(game, 'day')
+  game.submitDay(voter, action === 'candle' ? { action, targetId: other } : { action })
+  expect(game.usePower(game.monsterSeatId)).toBeNull()
+  return { game, voter, other, events: game.endPhase() }
 }
 
 describe('power:use rules', () => {
   it('works once per game', () => {
     const game = engineWith(5, 'vampire')
-    const [v1, v2] = villagerIds(game)
     advanceTo(game, 'day')
-    expect(game.usePower(game.monsterSeatId, v1)).toBeNull()
-    expect(game.usePower(game.monsterSeatId, v2)).toMatchObject({ code: 'power_used' })
+    game.submitDay(villagerIds(game)[0], { action: 'commune' })
+    expect(game.usePower(game.monsterSeatId)).toBeNull()
+    expect(game.usePower(game.monsterSeatId)).toMatchObject({ code: 'power_used' })
+    game.endPhase()
     advanceTo(game, 'day', 2)
-    expect(game.usePower(game.monsterSeatId, v2)).toMatchObject({ code: 'power_used' })
+    expect(game.usePower(game.monsterSeatId)).toMatchObject({ code: 'power_used' })
   })
 
-  it('is Day only, Monster only, and targets another living player', () => {
+  it('is Day only and Monster only', () => {
     const game = engineWith(5, 'witch')
-    const [v1, v2] = villagerIds(game)
-    expect(game.usePower(game.monsterSeatId, v1)).toMatchObject({ code: 'wrong_phase' })
+    const [v1] = villagerIds(game)
+    expect(game.usePower(game.monsterSeatId)).toMatchObject({ code: 'wrong_phase' })
     advanceTo(game, 'day')
-    expect(game.usePower(v2, v1)).toMatchObject({ code: 'not_allowed' })
-    expect(game.usePower(game.monsterSeatId, game.monsterSeatId)).toMatchObject({ code: 'invalid_target' })
-    expect(game.usePower(game.monsterSeatId, 'nobody')).toMatchObject({ code: 'invalid_target' })
+    expect(game.usePower(v1)).toMatchObject({ code: 'not_allowed' })
   })
 })
 
 describe('Vampire', () => {
-  it('blocks a Search, a Commune, and a Candle with results shaped like normal ones', () => {
-    for (const action of ['search', 'commune', 'candle'] as const) {
-      const game = engineWith(7, 'vampire')
-      const [victim, target, normal, guarded] = villagerIds(game)
-      game.submitNight(game.monsterSeatId, { victimIds: [victim] })
-      advanceTo(game, 'day')
-      const pick = action === 'candle' ? { action, targetId: guarded } : { action }
-      game.submitDay(target, pick)
-      game.submitDay(normal, pick)
-      expect(game.usePower(game.monsterSeatId, target)).toBeNull()
-
-      const results = new Map(game.endPhase().map((e) => [(e.to as { seatId: string }).seatId, e.payload as Record<string, unknown>]))
-      const blockedResult = results.get(target)!
-      expect(shape(blockedResult)).toBe(shape({ ...results.get(normal)!, ...(action === 'candle' ? {} : { trait: null }) }))
-      if (action === 'candle') expect(blockedResult).toEqual({ round: 1, action: 'candle', candleBlocked: true })
-      else expect(blockedResult).toEqual({ round: 1, action, trait: null })
-      expect(game.powerUsed).toBe(true)
-    }
+  it.each(['search', 'commune', 'candle'] as const)('blocks a %s, and the public result says so', (action) => {
+    const { game, events } = dayWithPower('vampire', action)
+    expect(dayResult(events)).toEqual({ round: 1, action, blocked: true })
+    expect(eventsNamed(events, 'you:result')).toEqual([])
+    expect(powerState(events)).toEqual({ powerUsed: true })
+    expect(game.powerUsed).toBe(true)
   })
 
-  it('a blocked Candle doesn’t protect its target', () => {
-    const game = engineWith(5, 'vampire')
-    const [guard, target] = villagerIds(game)
-    advanceTo(game, 'day')
-    game.submitDay(guard, { action: 'candle', targetId: target })
-    game.usePower(game.monsterSeatId, guard)
+  it('a blocked Candle protects nobody', () => {
+    const { game, other } = dayWithPower('vampire', 'candle')
     advanceTo(game, 'night', 2)
-    game.submitNight(game.monsterSeatId, { victimIds: [target] })
-    expect(eventsNamed(game.endPhase(), 'morning:reveal')).toEqual([{ round: 2, deadIds: [target] }])
+    game.submitNight(game.monsterSeatId, { victimIds: [other] })
+    expect(eventsNamed(game.endPhase(), 'morning:reveal')).toEqual([{ round: 2, deadIds: [other] }])
+  })
+
+  it('a blocked Search still takes Search off the next ballot', () => {
+    const { game } = dayWithPower('vampire', 'search')
+    advanceTo(game, 'morning', 2)
+    expect(eventsNamed(game.endPhase(), 'day:options')[0]).toMatchObject({ search: false })
+  })
+
+  it('keeps the power on a day with no action', () => {
+    const game = engineWith(5, 'vampire')
+    advanceTo(game, 'day')
+    game.usePower(game.monsterSeatId)
+    expect(powerState(game.endPhase())).toEqual({ powerUsed: false })
   })
 })
 
 describe('Witch', () => {
-  it('plants a fake trait that looks exactly like a real Search result', () => {
+  it('fakes a Search: the searcher gets a trait the Monster does not have, shaped like a real one', () => {
     for (let seed = 1; seed < 40; seed += 1) {
-      const game = engineWith(5, 'witch', seed)
-      const [target] = villagerIds(game)
-      advanceTo(game, 'day')
-      game.submitDay(target, { action: 'search' })
-      game.usePower(game.monsterSeatId, target)
-      const [result] = eventsNamed(game.endPhase(), 'you:result')
-      expect(shape(result)).toBe('action:string,round:number,trait:option+slot')
-      expect(monsterHas(game, result.trait)).toBe(false)
+      const { game, voter, events } = dayWithPower('witch', 'search', seed)
+      const [found] = events.filter((e) => e.event === 'you:result')
+      expect(found.to).toEqual({ seatId: voter })
+      expect(found.payload).toEqual({ round: 1, action: 'search', trait: { slot: expect.any(String), option: expect.any(String) } })
+      expect(monsterHas(game, (found.payload as any).trait)).toBe(false)
+      expect(dayResult(events)).toEqual({ round: 1, action: 'search', blocked: false, searcherId: voter })
       expect(game.powerUsed).toBe(true)
     }
   })
 
-  it('keeps the power when the target doesn’t Search', () => {
-    const game = engineWith(5, 'witch')
-    const [target, other] = villagerIds(game)
-    advanceTo(game, 'day')
-    game.submitDay(target, { action: 'candle', targetId: other })
-    expect(game.usePower(game.monsterSeatId, target)).toBeNull()
-    expect(eventsNamed(game.endPhase(), 'you:result')).toEqual([{ round: 1, action: 'candle', candleBlocked: false }])
-    expect(game.powerUsed).toBe(false)
+  it('fakes a Commune: the public trait is one the Monster does have', () => {
+    for (let seed = 1; seed < 40; seed += 1) {
+      const { game, events } = dayWithPower('witch', 'commune', seed)
+      const result = dayResult(events)
+      expect(result).toEqual({ round: 1, action: 'commune', blocked: false, trait: expect.any(Object) })
+      expect(monsterHas(game, result.trait)).toBe(true)
+      expect(powerState(events)).toEqual({ powerUsed: true })
+    }
+  })
+
+  it('keeps the power when Candle wins, and when nothing happens', () => {
+    const { game, events } = dayWithPower('witch', 'candle')
+    expect(dayResult(events)).toEqual({ round: 1, action: 'candle', blocked: false })
+    expect(powerState(events)).toEqual({ powerUsed: false })
 
     advanceTo(game, 'day', 2)
-    expect(game.usePower(game.monsterSeatId, target)).toBeNull()
+    expect(game.usePower(game.monsterSeatId)).toBeNull()
+    expect(powerState(game.endPhase())).toEqual({ powerUsed: false })
+    advanceTo(game, 'day', 3)
+    expect(game.usePower(game.monsterSeatId)).toBeNull()
   })
 })
 
@@ -162,19 +170,20 @@ describe('power:use over sockets', () => {
     await harness.close()
   })
 
-  it('rejects a second use and use outside Day', async () => {
+  it('takes no target, and rejects a second use and use outside Day', async () => {
     // Below 6 players the Monster is always a Vampire or Witch.
     harness = await startSocketServer({ clock, random: seededRandom(5) })
     const game = await startGame(harness, () => ({ code: createRoom(HOST_ID, 'normal').code, hostToken: signAccessToken(HOST_ID) }), 4)
-    const [v1, v2] = game.villagers
-    game.monster.emit('power:use', { targetId: game.seatOf(v1) })
+    const [v1] = game.villagers
+    game.monster.emit('power:use', {})
     expect(await game.monster.next('error')).toMatchObject({ code: 'wrong_phase', event: 'power:use' })
 
     clock.advance(40_000)
     await game.monster.next('phase:start', (p) => p.phase === 'day')
+    // Older phones still send a target; it is ignored.
     await game.monster.send('power:use', { targetId: game.seatOf(v1) })
     expect(game.monster.all('error').filter((e: { event: string }) => e.event === 'power:use')).toHaveLength(1)
-    game.monster.emit('power:use', { targetId: game.seatOf(v2) })
+    game.monster.emit('power:use', {})
     expect(await game.monster.next('error', (e) => e.event === 'power:use')).toMatchObject({ code: 'power_used' })
     expect(getRoom(game.code)!.game!.monsterType).toMatch(/vampire|witch/)
   })
