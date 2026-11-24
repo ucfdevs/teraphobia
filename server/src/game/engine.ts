@@ -2,7 +2,7 @@ import { deal, OPTIONS, SLOTS } from './deal.js'
 import type { Costume, MonsterType, Slot } from './deal.js'
 import { nextPhase } from './phases.js'
 import type { Phase } from './phases.js'
-import { pick, shuffle } from './random.js'
+import { pick } from './random.js'
 import type { Rng } from './random.js'
 
 // The pure game engine: all rules and state, no sockets or timers. The socket layer feeds it events and
@@ -60,16 +60,30 @@ export interface Trait {
   option: string
 }
 
-// A private `you:result`. Search and Commune carry a trait (null when nothing was found); Candle carries candleBlocked.
-export type DayResult =
-  | { round: number; action: 'search' | 'commune'; trait: Trait | null }
-  | { round: number; action: 'candle'; candleBlocked: boolean }
+// The private `you:result` the searcher gets: one trait the Monster wears (or the Witch's fake).
+export interface SearchResult {
+  round: number
+  action: 'search'
+  trait: Trait
+}
 
-// Successful Searches and Communes per Day (PRD; the balance script may raise Search to 3 at 7 to 8 players).
-export const SEARCH_CAP = 2
-export const COMMUNE_CAP = 2
-// Even a successful Search finds nothing this often, so empty Searches don't point at a Vampire.
-export const EMPTY_SEARCH_CHANCE = 0.2
+// `day:options`: what is on today's ballot. Candle always is.
+export interface DayOptions {
+  round: number
+  search: boolean
+  commune: boolean
+}
+
+// `day:result`: the village's action, shown on the shared screen. A Candle's target is never named.
+export interface DayOutcome {
+  round: number
+  action: DayAction | 'none'
+  blocked: boolean
+  // Search only: who searched (they got the trait privately).
+  searcherId?: string
+  // Commune only: a trait the Monster does not have (or the Witch's fake).
+  trait?: Trait
+}
 
 export interface Hunch {
   seatId: string
@@ -79,6 +93,12 @@ export interface Hunch {
 
 const reject = (code: ErrorCode, message: string): Rejection => ({ code, message })
 
+// Rule switches for the balance script (#116). Real games use the defaults.
+export interface RuleOptions {
+  // Search is off the ballot the day after a Search. Default true.
+  searchCooldown?: boolean
+}
+
 export class GameEngine {
   readonly players: Player[]
   readonly monsterSeatId: string
@@ -87,29 +107,39 @@ export class GameEngine {
   round = 1
   // Every Villager hunch, for game over.
   readonly hunches: Hunch[] = []
-  // Who died in the last Night (for Commune).
+  // Who died in the last Night.
   lastNightDeaths: string[] = []
   // This Night's picks; the last submit counts.
   private victimIds: string[] = []
   private suspects = new Map<string, string>()
-  // Seats protected from tonight's kill by candles lit during Day.
+  // Seats protected from tonight's kill by the village's Candle.
   private protectedTonight = new Set<string>()
-  // This Day's actions; the last submit counts.
-  private dayActions = new Map<string, DaySubmit>()
-  // Who each player lit a candle for last Day (no same target two nights in a row).
+  // This Day's ballots, one per living player; the last submit counts.
+  private ballots = new Map<string, DaySubmit>()
+  // Who each player voted to protect on the last Day they voted Candle (their own ballot; for rejoins).
   readonly lastCandleTarget = new Map<string, string>()
-  // Every private Day result each player has received, oldest first (for rejoins).
-  readonly results = new Map<string, DayResult[]>()
+  // The player the Candle protected last night, who can't be protected again tonight.
+  lastProtected: string | null = null
+  // The last round whose action was Search (blocked or not): no Search the next day.
+  private lastSearchRound = 0
+  // The latest `day:result`, for rejoins.
+  lastDayOutcome: DayOutcome | null = null
+  // Every private Search result each player has received, oldest first (for rejoins).
+  readonly results = new Map<string, SearchResult[]>()
   // The Monster's once-per-game power.
   powerUsed = false
-  // Today's Vampire block or Witch fake, resolved at Day end.
-  private powerTarget: string | undefined
+  // Vampire or Witch power waiting for today's result.
+  private powerPending = false
   // This Vote's ballots: a seat id, or null for Skip. The last submit counts.
   private votes = new Map<string, string | null>()
   // Set once someone wins; the game takes no more events.
   over: GameOver | undefined
 
-  constructor(seatIds: string[], readonly rng: Rng) {
+  constructor(
+    seatIds: string[],
+    readonly rng: Rng,
+    private readonly rules: RuleOptions = {},
+  ) {
     const { costumes, monsterIndex, monsterType } = deal(seatIds.length, rng)
     this.players = seatIds.map((seatId, i) => ({
       seatId,
@@ -134,6 +164,7 @@ export class GameEngine {
     if (this.over) return events
     this.phase = nextPhase(ending)
     if (ending === 'vote') this.round += 1
+    if (this.phase === 'day') events.push({ to: 'room', event: 'day:options', payload: this.dayOptions() })
     return events
   }
 
@@ -213,21 +244,29 @@ export class GameEngine {
     return null
   }
 
+  dayOptions(): DayOptions {
+    const cooldown = this.rules.searchCooldown ?? true
+    const searchedYesterday = cooldown && this.lastSearchRound > 0 && this.lastSearchRound === this.round - 1
+    return { round: this.round, search: !searchedYesterday, commune: true }
+  }
+
+  // Every living player votes, the Monster included, so all phones behave the same.
   submitDay(seatId: string, submit: DaySubmit): Rejection | null {
     const player = this.actor(seatId, 'day')
     if ('code' in player) return player
-    if (player.role !== 'villager') return reject('not_allowed', 'The Monster takes no Day action')
-
+    if (submit.action === 'search' && !this.dayOptions().search) return reject('not_allowed', 'Search isn’t on the ballot the day after a Search')
     if (submit.action === 'candle') {
       const target = submit.targetId
-      if (!target || target === seatId) return reject('invalid_target', 'Light a candle for another player')
-      if (!this.alive(target)) return reject('invalid_target', 'Pick a living player')
-      if (this.lastCandleTarget.get(seatId) === target) {
-        return reject('invalid_target', 'You can’t protect the same player two nights in a row')
-      }
+      if (!target || !this.alive(target)) return reject('invalid_target', 'Pick a living player to protect')
+      if (target === this.lastProtected) return reject('invalid_target', 'That player was protected last night')
     }
-    this.dayActions.set(seatId, { ...submit })
+    this.ballots.set(seatId, submit.action === 'candle' ? { action: 'candle', targetId: submit.targetId } : { action: submit.action })
     return null
+  }
+
+  // `day:progress`: how many have voted, never what.
+  dayProgress() {
+    return { round: this.round, voted: [...this.ballots.keys()].filter((id) => this.alive(id)).length, voters: this.livingPlayers().length }
   }
 
   // Why a double kill isn't allowed tonight, or null if it is.
@@ -260,16 +299,16 @@ export class GameEngine {
     return [{ to: 'room', event: 'vote:reveal', payload: { round: this.round, votes, banishedId } }]
   }
 
-  // Vampire and Witch powers, during Day. The Werewolf's double kill goes through night:submit.
-  usePower(seatId: string, targetId: string): Rejection | null {
+  // Vampire and Witch powers, during Day, with no target: they act on today's village action.
+  // The Werewolf's double kill goes through night:submit.
+  usePower(seatId: string): Rejection | null {
     const player = this.player(seatId)
     if (this.over) return reject('wrong_phase', 'The game is over')
     if (!player || player.role !== 'monster' || player.lifeStatus !== 'alive') return reject('not_allowed', 'Only the Monster has a power')
     if (this.monsterType === 'werewolf') return reject('not_allowed', 'The Werewolf kills twice with night:submit')
     if (this.phase !== 'day') return reject('wrong_phase', 'The power can only be used during Day')
-    if (this.powerUsed || this.powerTarget) return reject('power_used', 'The power is already used')
-    if (targetId === seatId || !this.alive(targetId)) return reject('invalid_target', 'Pick another living player')
-    this.powerTarget = targetId
+    if (this.powerUsed || this.powerPending) return reject('power_used', 'The power is already used')
+    this.powerPending = true
     return null
   }
 
@@ -298,62 +337,63 @@ export class GameEngine {
     return { slot, option: pick(this.rng, OPTIONS[slot].filter((o) => o !== monsterOption)) }
   }
 
+  // The option with the most votes; ties are broken at random. Undefined when there are none.
+  private plurality<T>(votes: T[]): T | undefined {
+    const tally = new Map<T, number>()
+    for (const vote of votes) tally.set(vote, (tally.get(vote) ?? 0) + 1)
+    const top = Math.max(0, ...tally.values())
+    const leaders = [...tally].filter(([, n]) => n === top).map(([vote]) => vote)
+    return leaders.length > 0 ? pick(this.rng, leaders) : undefined
+  }
+
   private resolveDay(): Outbound[] {
     const round = this.round
-    const results = new Map<string, DayResult>()
-    const blocked = this.monsterType === 'vampire' ? this.powerTarget : undefined
-    const witchTarget = this.monsterType === 'witch' ? this.powerTarget : undefined
-    // A blocked player, and the Witch's target when Searching, don't take a success slot; theirs are set below.
-    const takers = (action: DayAction) =>
-      shuffle(
-        this.rng,
-        [...this.dayActions]
-          .filter(([id, a]) => a.action === action && id !== blocked && !(action === 'search' && id === witchTarget))
-          .map(([id]) => id),
-      )
+    const ballots = [...this.ballots].filter(([id]) => this.alive(id))
+    const action = this.plurality(ballots.map(([, b]) => b.action)) ?? 'none'
+    const acted = action !== 'none'
+    const blocked = acted && this.powerPending && this.monsterType === 'vampire'
+    // The Witch fakes a Search or Commune; on a Candle day or a day with no action, she keeps the power.
+    const faked = this.powerPending && this.monsterType === 'witch' && (action === 'search' || action === 'commune')
+    if (blocked || faked) this.powerUsed = true
+    this.powerPending = false
 
-    // Searches: up to SEARCH_CAP random searchers succeed; the rest find nothing.
-    takers('search').forEach((seatId, i) => {
-      const found = i < SEARCH_CAP && this.rng() >= EMPTY_SEARCH_CHANCE
-      results.set(seatId, { round, action: 'search', trait: found ? this.monsterTrait() : null })
-    })
+    const outcome: DayOutcome = { round, action, blocked }
+    const events: Outbound[] = []
+    let protectedId: string | null = null
 
-    // Communes: up to COMMUNE_CAP succeed, and only if someone died last night.
-    const spirits = this.lastNightDeaths.length > 0
-    takers('commune').forEach((seatId, i) => {
-      results.set(seatId, { round, action: 'commune', trait: spirits && i < COMMUNE_CAP ? this.notMonsterTrait() : null })
-    })
-
-    // Candles: protect their target tonight. A save is never reported.
-    this.lastCandleTarget.clear()
-    for (const [seatId, action] of this.dayActions) {
-      if (action.action !== 'candle') continue
-      this.lastCandleTarget.set(seatId, action.targetId!)
-      if (seatId !== blocked) this.protectedTonight.add(action.targetId!)
-      results.set(seatId, { round, action: 'candle', candleBlocked: seatId === blocked })
+    if (action === 'search') {
+      this.lastSearchRound = round
+      if (!blocked) {
+        // One Villager who voted Search, or any living Villager if none did.
+        const voters = ballots.filter(([id, b]) => b.action === 'search' && this.player(id)!.role === 'villager').map(([id]) => id)
+        const searcherId = pick(this.rng, voters.length > 0 ? voters : this.livingPlayers().filter((p) => p.role === 'villager').map((p) => p.seatId))
+        const result: SearchResult = { round, action: 'search', trait: faked ? this.notMonsterTrait() : this.monsterTrait() }
+        this.results.set(searcherId, [...(this.results.get(searcherId) ?? []), result])
+        outcome.searcherId = searcherId
+        events.push({ to: { seatId: searcherId }, event: 'you:result', payload: result })
+      }
+    } else if (action === 'commune' && !blocked) {
+      // The Witch names one of her own traits as one the Monster lacks.
+      outcome.trait = faked ? this.monsterTrait() : this.notMonsterTrait()
+    } else if (action === 'candle' && !blocked) {
+      protectedId = this.plurality(ballots.filter(([, b]) => b.action === 'candle').map(([, b]) => b.targetId!)) ?? null
+      if (protectedId) this.protectedTonight.add(protectedId)
     }
+    this.lastProtected = protectedId
 
-    // Vampire: a blocked Search or Commune looks exactly like an empty one.
-    const blockedAction = blocked && this.dayActions.get(blocked)?.action
-    if (blocked && (blockedAction === 'search' || blockedAction === 'commune')) {
-      results.set(blocked, { round, action: blockedAction, trait: null })
+    for (const [id, b] of ballots) {
+      if (b.action === 'candle') this.lastCandleTarget.set(id, b.targetId!)
+      else this.lastCandleTarget.delete(id)
     }
+    this.ballots.clear()
+    this.lastDayOutcome = outcome
 
-    // Witch: the target's Search gets a fake trait that looks like a real one. No Search, and the power is kept.
-    const witchFaked = witchTarget !== undefined && this.dayActions.get(witchTarget)?.action === 'search'
-    if (witchFaked) results.set(witchTarget, { round, action: 'search', trait: this.notMonsterTrait() })
-
-    if (blocked || witchFaked) this.powerUsed = true
-    this.powerTarget = undefined
-
-    this.dayActions.clear()
-    // Seat order, so nothing about the shuffle leaks through timing.
-    return this.players.flatMap(({ seatId }) => {
-      const result = results.get(seatId)
-      if (!result) return []
-      this.results.set(seatId, [...(this.results.get(seatId) ?? []), result])
-      return [{ to: { seatId }, event: 'you:result', payload: result }]
-    })
+    // Public result first, then the searcher's private trait, then the Monster's real power state.
+    return [
+      { to: 'room', event: 'day:result', payload: outcome },
+      ...events,
+      { to: { seatId: this.monsterSeatId }, event: 'you:power', payload: { powerUsed: this.powerUsed } },
+    ]
   }
 
   player(seatId: string) {

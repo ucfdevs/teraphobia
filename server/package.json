@@ -12,7 +12,8 @@
     "start": "node --env-file=.env dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bots": "tsx scripts/bots.ts"
+    "bots": "tsx scripts/bots.ts",
+    "balance": "tsx scripts/balance.ts"
   },
   "dependencies": {
     "ajv": "^8.20.0",

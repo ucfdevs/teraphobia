@@ -112,7 +112,7 @@ describe('win checks', () => {
     game.submitNight(game.monsterSeatId, { victimIds: [v1] })
     game.submitNight(v2, { suspectId: game.monsterSeatId })
     game.endPhase()
-    expect(game.endPhase()).toEqual([]) // Morning 1: two Villagers left
+    expect(eventsNamed(game.endPhase(), 'game:over')).toEqual([]) // Morning 1: two Villagers left
     advanceTo(game, 'night', 2)
     game.submitNight(game.monsterSeatId, { victimIds: [v2] })
     game.endPhase()

@@ -70,6 +70,9 @@ describe('rejoin', () => {
       you: game.roles[game.phones.indexOf(searcher)],
       results: [result],
       lastCandleTargetId: null,
+      // Day is over, so no ballot; the village's Search names this player.
+      dayOptions: null,
+      dayResult: { round: 1, action: 'search', blocked: false, searcherId: game.seatOf(searcher) },
     })
     expect(await back.next('you:joined')).toMatchObject({ seatId: game.seatOf(searcher) })
     const state = await game.host.next('room:state', (s) => s.seats.every((seat: { connected: boolean }) => seat.connected))

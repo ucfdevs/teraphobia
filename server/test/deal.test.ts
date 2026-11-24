@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deal, dealCostumes, isFairDeal, OPTIONS, pickMonsterType, sharedTraits, SLOTS } from '../src/game/deal.js'
+import { deal, dealCostumes, isFairDeal, isSpreadDeal, optionCap, OPTIONS, pickMonsterType, sharedTraits, SLOTS } from '../src/game/deal.js'
 import { GameEngine } from '../src/game/engine.js'
 import { seededRandom } from '../src/game/random.js'
 
@@ -72,5 +72,36 @@ describe('GameEngine roles', () => {
     expect(monsters).toHaveLength(1)
     expect(monsters[0]).toMatchObject({ seatId: game.monsterSeatId, monsterType: game.monsterType })
     for (const r of roles.filter((r) => r.role === 'villager')) expect(r).not.toHaveProperty('monsterType')
+  })
+})
+
+describe('spread deal (#106)', () => {
+  // Average distinct options per slot before #106, from the issue.
+  const BASELINE: Record<number, number> = { 4: 2.11, 5: 2.44, 6: 2.72, 7: 2.96, 8: 3.16 }
+
+  it.each(PLAYER_COUNTS)('5,000 seeded deals for %i players stay fair, under the cap, and more spread out', (count) => {
+    const rng = seededRandom(5000 + count)
+    const cap = optionCap(count)
+    let distinct = 0
+    for (let i = 0; i < 5_000; i += 1) {
+      const costumes = dealCostumes(count, rng)
+      if (!isFairDeal(costumes)) throw new Error(`Unfair deal ${i}`)
+      for (const slot of SLOTS) {
+        const worn = new Map<string, number>()
+        for (const c of costumes) worn.set(c[slot], (worn.get(c[slot]) ?? 0) + 1)
+        if (Math.max(...worn.values()) > cap) throw new Error(`Deal ${i} puts one ${slot} on more than ${cap} players`)
+        distinct += worn.size
+      }
+    }
+    const average = distinct / 5_000 / SLOTS.length
+    console.log(`${count} players: ${average.toFixed(2)} distinct options per slot (was ${BASELINE[count]})`)
+    expect(average).toBeGreaterThan(BASELINE[count])
+  })
+
+  it('isSpreadDeal catches an option worn by more than half the room', () => {
+    const c = (hat: string, mask: string, item: string) => ({ hat, mask, item })
+    const crowded = [c('crown', 'beak-mask', 'lantern'), c('crown', 'beak-mask', 'raven'), c('crown', 'skull-mask', 'raven'), c('top-hat', 'skull-mask', 'raven')]
+    expect(isFairDeal(crowded)).toBe(true)
+    expect(isSpreadDeal(crowded)).toBe(false)
   })
 })

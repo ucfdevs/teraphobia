@@ -11,6 +11,9 @@
 //   let roomKick = try RoomKick(json)
 //   let roomStart = try RoomStart(json)
 //   let voteSubmit = try VoteSubmit(json)
+//   let dayOptions = try DayOptions(json)
+//   let dayProgress = try DayProgress(json)
+//   let dayResult = try DayResult(json)
 //   let serverError = try ServerError(json)
 //   let gameOver = try GameOver(json)
 //   let morningReveal = try MorningReveal(json)
@@ -18,6 +21,7 @@
 //   let roomState = try RoomState(json)
 //   let voteReveal = try VoteReveal(json)
 //   let youJoined = try YouJoined(json)
+//   let youPower = try YouPower(json)
 //   let youRejoined = try YouRejoined(json)
 //   let youResult = try YouResult(json)
 //   let youRole = try YouRole(json)
@@ -30,13 +34,14 @@
 
 import Foundation
 
-/// Client to server, event `day:submit`. A living Villager picks one private Day action.
-/// Candle needs a target; Search and Commune take none.
+/// Client to server, event `day:submit`. Every living player, the Monster included, casts
+/// one ballot for the village's Day action; the last ballot counts. Candle needs a target;
+/// Search and Commune take none.
 // MARK: - DaySubmit
 public struct DaySubmit: Codable, Equatable {
     public let action: DayAction
-    /// Candle only. The player to protect tonight. Not yourself, and not the same player two
-    /// nights in a row (checked by the server).
+    /// Candle only. The player the voter wants protected tonight. Can't be the player the Candle
+    /// protected last night (checked by the server).
     public let targetID: String?
 
     public enum CodingKeys: String, CodingKey {
@@ -165,18 +170,20 @@ public extension NightSubmit {
 // for types that require the use of JSONAny, nor will the implementation of Hashable be
 // synthesized for types that have collections (such as arrays or dictionaries).
 
-/// Client to server, event `power:use`. Monster only, once per game, during Day. Vampire
-/// blocks the target's action; Witch plants a fake clue in the target's Search. The
-/// Werewolf's double kill goes through `night:submit` instead.
+/// Client to server, event `power:use`. Monster only, once per game, during Day. Takes no
+/// target: the Vampire blocks today's village action, and the Witch fakes today's Search or
+/// Commune result (if Candle wins or nothing happens, she keeps the power). The Werewolf's
+/// double kill goes through `night:submit` instead.
 // MARK: - PowerUse
 public struct PowerUse: Codable, Equatable {
-    public let targetID: String
+    /// Deprecated and ignored. Older phones still send it.
+    public let targetID: String?
 
     public enum CodingKeys: String, CodingKey {
         case targetID = "targetId"
     }
 
-    public init(targetID: String) {
+    public init(targetID: String?) {
         self.targetID = targetID
     }
 }
@@ -200,7 +207,7 @@ public extension PowerUse {
     }
 
     func with(
-        targetID: String? = nil
+        targetID: String?? = nil
     ) -> PowerUse {
         return PowerUse(
             targetID: targetID ?? self.targetID
@@ -426,6 +433,65 @@ public extension VoteSubmit {
     ) -> VoteSubmit {
         return VoteSubmit(
             targetID: targetID ?? self.targetID
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+//
+// Hashable or Equatable:
+// The compiler will not be able to synthesize the implementation of Hashable or Equatable
+// for types that require the use of JSONAny, nor will the implementation of Hashable be
+// synthesized for types that have collections (such as arrays or dictionaries).
+
+/// Server to all, event `day:progress`. Sent after each accepted Day ballot: how many living
+/// players have voted. Never says what anyone voted.
+// MARK: - DayProgress
+public struct DayProgress: Codable, Equatable {
+    public let round: Int
+    public let voted, voters: Int
+
+    public init(round: Int, voted: Int, voters: Int) {
+        self.round = round
+        self.voted = voted
+        self.voters = voters
+    }
+}
+
+// MARK: DayProgress convenience initializers and mutators
+
+public extension DayProgress {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(DayProgress.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        round: Int? = nil,
+        voted: Int? = nil,
+        voters: Int? = nil
+    ) -> DayProgress {
+        return DayProgress(
+            round: round ?? self.round,
+            voted: voted ?? self.voted,
+            voters: voters ?? self.voters
         )
     }
 
@@ -984,29 +1050,88 @@ public extension YouJoined {
 // for types that require the use of JSONAny, nor will the implementation of Hashable be
 // synthesized for types that have collections (such as arrays or dictionaries).
 
+/// Server to one, event `you:power`. Sent to the Monster after every Day with its real power
+/// state, so the phone can show or hide the power button. A Witch whose power had no effect
+/// keeps it.
+// MARK: - YouPower
+public struct YouPower: Codable, Equatable {
+    public let powerUsed: Bool
+
+    public init(powerUsed: Bool) {
+        self.powerUsed = powerUsed
+    }
+}
+
+// MARK: YouPower convenience initializers and mutators
+
+public extension YouPower {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(YouPower.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        powerUsed: Bool? = nil
+    ) -> YouPower {
+        return YouPower(
+            powerUsed: powerUsed ?? self.powerUsed
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+//
+// Hashable or Equatable:
+// The compiler will not be able to synthesize the implementation of Hashable or Equatable
+// for types that require the use of JSONAny, nor will the implementation of Hashable be
+// synthesized for types that have collections (such as arrays or dictionaries).
+
 /// Server to one, event `you:rejoined`. Everything this player already knows, sent after
 /// they reconnect to their seat. Contains nothing they weren't sent before.
 // MARK: - YouRejoined
 public struct YouRejoined: Codable, Equatable {
-    /// Who this player lit a candle for last Day, so the phone can grey them out tonight. Null
-    /// if none.
+    /// Today's ballot while it is Day; null otherwise.
+    public let dayOptions: DayOptions?
+    /// The latest village Day action; null before the first Day ends.
+    public let dayResult: DayResult?
+    /// Who this player voted to protect on the last Day they voted Candle. Null if none.
     public let lastCandleTargetID: String?
     /// Current phase and timer. Null while the room is still in the lobby.
     public let phase: PhaseStart?
     /// Monster only. True once the Monster's power is spent, so the button stays hidden.
     public let powerUsed: Bool?
-    /// Every private Day result this player has received, oldest first.
+    /// Every private Search result this player has received, oldest first.
     public let results: [YouResult]
     public let room: RoomState
     /// This player's role and costume. Null while the room is still in the lobby.
     public let you: YouRole?
 
     public enum CodingKeys: String, CodingKey {
+        case dayOptions, dayResult
         case lastCandleTargetID = "lastCandleTargetId"
         case phase, powerUsed, results, room, you
     }
 
-    public init(lastCandleTargetID: String?, phase: PhaseStart?, powerUsed: Bool?, results: [YouResult], room: RoomState, you: YouRole?) {
+    public init(dayOptions: DayOptions?, dayResult: DayResult?, lastCandleTargetID: String?, phase: PhaseStart?, powerUsed: Bool?, results: [YouResult], room: RoomState, you: YouRole?) {
+        self.dayOptions = dayOptions
+        self.dayResult = dayResult
         self.lastCandleTargetID = lastCandleTargetID
         self.phase = phase
         self.powerUsed = powerUsed
@@ -1035,6 +1160,8 @@ public extension YouRejoined {
     }
 
     func with(
+        dayOptions: DayOptions?? = nil,
+        dayResult: DayResult?? = nil,
         lastCandleTargetID: String?? = nil,
         phase: PhaseStart?? = nil,
         powerUsed: Bool?? = nil,
@@ -1043,6 +1170,8 @@ public extension YouRejoined {
         you: YouRole?? = nil
     ) -> YouRejoined {
         return YouRejoined(
+            dayOptions: dayOptions ?? self.dayOptions,
+            dayResult: dayResult ?? self.dayResult,
             lastCandleTargetID: lastCandleTargetID ?? self.lastCandleTargetID,
             phase: phase ?? self.phase,
             powerUsed: powerUsed ?? self.powerUsed,
@@ -1059,6 +1188,234 @@ public extension YouRejoined {
     func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
         return String(data: try self.jsonData(), encoding: encoding)
     }
+}
+
+//
+// Hashable or Equatable:
+// The compiler will not be able to synthesize the implementation of Hashable or Equatable
+// for types that require the use of JSONAny, nor will the implementation of Hashable be
+// synthesized for types that have collections (such as arrays or dictionaries).
+
+/// Server to all, event `day:options`. Sent when Day starts: what is on today's group
+/// ballot. Candle is always on it; Search is off the day after the village's action was
+/// Search.
+// MARK: - DayOptions
+public struct DayOptions: Codable, Equatable {
+    public let commune: Bool
+    public let round: Int
+    public let search: Bool
+
+    public init(commune: Bool, round: Int, search: Bool) {
+        self.commune = commune
+        self.round = round
+        self.search = search
+    }
+}
+
+// MARK: DayOptions convenience initializers and mutators
+
+public extension DayOptions {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(DayOptions.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        commune: Bool? = nil,
+        round: Int? = nil,
+        search: Bool? = nil
+    ) -> DayOptions {
+        return DayOptions(
+            commune: commune ?? self.commune,
+            round: round ?? self.round,
+            search: search ?? self.search
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+//
+// Hashable or Equatable:
+// The compiler will not be able to synthesize the implementation of Hashable or Equatable
+// for types that require the use of JSONAny, nor will the implementation of Hashable be
+// synthesized for types that have collections (such as arrays or dictionaries).
+
+/// Server to all, event `day:result`. Sent when Day ends: the action the village voted for,
+/// shown on the shared screen. A Candle's target is never named. A Search names who
+/// searched; only that phone gets the trait (`you:result`).
+// MARK: - DayResult
+public struct DayResult: Codable, Equatable {
+    /// The ballot winner, or none when nobody voted.
+    public let action: Action
+    /// True when the Vampire blocked today's action.
+    public let blocked: Bool
+    public let round: Int
+    /// Search only, when not blocked: the Villager who searched.
+    public let searcherID: String?
+    /// Commune only, when not blocked: a trait the Monster does not have.
+    public let trait: Trait?
+
+    public enum CodingKeys: String, CodingKey {
+        case action, blocked, round
+        case searcherID = "searcherId"
+        case trait
+    }
+
+    public init(action: Action, blocked: Bool, round: Int, searcherID: String?, trait: Trait?) {
+        self.action = action
+        self.blocked = blocked
+        self.round = round
+        self.searcherID = searcherID
+        self.trait = trait
+    }
+}
+
+// MARK: DayResult convenience initializers and mutators
+
+public extension DayResult {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(DayResult.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        action: Action? = nil,
+        blocked: Bool? = nil,
+        round: Int? = nil,
+        searcherID: String?? = nil,
+        trait: Trait?? = nil
+    ) -> DayResult {
+        return DayResult(
+            action: action ?? self.action,
+            blocked: blocked ?? self.blocked,
+            round: round ?? self.round,
+            searcherID: searcherID ?? self.searcherID,
+            trait: trait ?? self.trait
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+/// The ballot winner, or none when nobody voted.
+public enum Action: String, Codable, Equatable {
+    case candle = "candle"
+    case commune = "commune"
+    case none = "none"
+    case search = "search"
+}
+
+//
+// Hashable or Equatable:
+// The compiler will not be able to synthesize the implementation of Hashable or Equatable
+// for types that require the use of JSONAny, nor will the implementation of Hashable be
+// synthesized for types that have collections (such as arrays or dictionaries).
+
+/// Commune only, when not blocked: a trait the Monster does not have.
+///
+/// One costume trait, used in Search and Commune results.
+// MARK: - Trait
+public struct Trait: Codable, Equatable {
+    public let option: TraitOption
+    public let slot: TraitSlot
+
+    public init(option: TraitOption, slot: TraitSlot) {
+        self.option = option
+        self.slot = slot
+    }
+}
+
+// MARK: Trait convenience initializers and mutators
+
+public extension Trait {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(Trait.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        option: TraitOption? = nil,
+        slot: TraitSlot? = nil
+    ) -> Trait {
+        return Trait(
+            option: option ?? self.option,
+            slot: slot ?? self.slot
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+/// Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in
+/// web/public/sprites (#78).
+public enum TraitOption: String, Codable, Equatable {
+    case beakMask = "beak-mask"
+    case crown = "crown"
+    case dominoMask = "domino-mask"
+    case hornedHelmet = "horned-helmet"
+    case jesterCap = "jester-cap"
+    case lantern = "lantern"
+    case pitchfork = "pitchfork"
+    case pumpkinMask = "pumpkin-mask"
+    case raven = "raven"
+    case skullMask = "skull-mask"
+    case topHat = "top-hat"
+    case umbrella = "umbrella"
+}
+
+public enum TraitSlot: String, Codable, Equatable {
+    case hat = "hat"
+    case item = "item"
+    case mask = "mask"
 }
 
 //
@@ -1142,10 +1499,10 @@ public enum Phase: String, Codable, Equatable {
 // for types that require the use of JSONAny, nor will the implementation of Hashable be
 // synthesized for types that have collections (such as arrays or dictionaries).
 
-/// Server to one, event `you:result`. Private result of the player's Day action, sent when
-/// Day ends. Blocked and faked results look exactly like normal ones. Client text: Search
-/// null = "You found nothing", Commune null = "The dead are silent", Candle blocked = "The
-/// Monster blocked your candle".
+/// Server to one, event `you:result`. Sent at Day end only to the Villager who searched for
+/// the village: one trait the Monster wears (the Witch's fake looks the same). Commune and
+/// Candle results are public in `day:result`; the commune and candle shapes stay only so
+/// older phones still decode.
 // MARK: - YouResult
 public struct YouResult: Codable, Equatable {
     public let action: DayAction
@@ -1204,84 +1561,6 @@ public extension YouResult {
     func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
         return String(data: try self.jsonData(), encoding: encoding)
     }
-}
-
-//
-// Hashable or Equatable:
-// The compiler will not be able to synthesize the implementation of Hashable or Equatable
-// for types that require the use of JSONAny, nor will the implementation of Hashable be
-// synthesized for types that have collections (such as arrays or dictionaries).
-
-/// One costume trait, used in Search and Commune results.
-// MARK: - Trait
-public struct Trait: Codable, Equatable {
-    public let option: TraitOption
-    public let slot: TraitSlot
-
-    public init(option: TraitOption, slot: TraitSlot) {
-        self.option = option
-        self.slot = slot
-    }
-}
-
-// MARK: Trait convenience initializers and mutators
-
-public extension Trait {
-    init(data: Data) throws {
-        self = try newJSONDecoder().decode(Trait.self, from: data)
-    }
-
-    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
-        guard let data = json.data(using: encoding) else {
-            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
-        }
-        try self.init(data: data)
-    }
-
-    init(fromURL url: URL) throws {
-        try self.init(data: try Data(contentsOf: url))
-    }
-
-    func with(
-        option: TraitOption? = nil,
-        slot: TraitSlot? = nil
-    ) -> Trait {
-        return Trait(
-            option: option ?? self.option,
-            slot: slot ?? self.slot
-        )
-    }
-
-    func jsonData() throws -> Data {
-        return try newJSONEncoder().encode(self)
-    }
-
-    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
-        return String(data: try self.jsonData(), encoding: encoding)
-    }
-}
-
-/// Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in
-/// web/public/sprites (#78).
-public enum TraitOption: String, Codable, Equatable {
-    case beakMask = "beak-mask"
-    case crown = "crown"
-    case dominoMask = "domino-mask"
-    case hornedHelmet = "horned-helmet"
-    case jesterCap = "jester-cap"
-    case lantern = "lantern"
-    case pitchfork = "pitchfork"
-    case pumpkinMask = "pumpkin-mask"
-    case raven = "raven"
-    case skullMask = "skull-mask"
-    case topHat = "top-hat"
-    case umbrella = "umbrella"
-}
-
-public enum TraitSlot: String, Codable, Equatable {
-    case hat = "hat"
-    case item = "item"
-    case mask = "mask"
 }
 
 //
