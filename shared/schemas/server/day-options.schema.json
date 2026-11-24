@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DayOptions",
+  "description": "Server to all, event `day:options`. Sent when Day starts: what is on today's group ballot. Candle is always on it; Search is off the day after the village's action was Search.",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../common.schema.json#/definitions/Round"
+    },
+    "search": {
+      "type": "boolean"
+    },
+    "commune": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "round",
+    "search",
+    "commune"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "YouPower",
+  "description": "Server to one, event `you:power`. Sent to the Monster after every Day with its real power state, so the phone can show or hide the power button. A Witch whose power had no effect keeps it.",
+  "type": "object",
+  "properties": {
+    "powerUsed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "powerUsed"
+  ],
+  "additionalProperties": false
+}

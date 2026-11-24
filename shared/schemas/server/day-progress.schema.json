@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DayProgress",
+  "description": "Server to all, event `day:progress`. Sent after each accepted Day ballot: how many living players have voted. Never says what anyone voted.",
+  "type": "object",
+  "properties": {
+    "round": {
+      "$ref": "../common.schema.json#/definitions/Round"
+    },
+    "voted": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "voters": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    }
+  },
+  "required": [
+    "round",
+    "voted",
+    "voters"
+  ],
+  "additionalProperties": false
+}

@@ -1,11 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "PowerUse",
-  "description": "Client to server, event `power:use`. Monster only, once per game, during Day. Vampire blocks the target's action; Witch plants a fake clue in the target's Search. The Werewolf's double kill goes through `night:submit` instead.",
+  "description": "Client to server, event `power:use`. Monster only, once per game, during Day. Takes no target: the Vampire blocks today's village action, and the Witch fakes today's Search or Commune result (if Candle wins or nothing happens, she keeps the power). The Werewolf's double kill goes through `night:submit` instead.",
   "type": "object",
   "properties": {
-    "targetId": { "$ref": "../common.schema.json#/definitions/SeatId" }
+    "targetId": {
+      "description": "Deprecated and ignored. Older phones still send it.",
+      "$ref": "../common.schema.json#/definitions/SeatId"
+    }
   },
-  "required": ["targetId"],
+  "required": [],
   "additionalProperties": false
 }

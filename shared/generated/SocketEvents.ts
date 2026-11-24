@@ -2,14 +2,15 @@
 // Run `npm run generate` in shared/ after changing a schema.
 
 /**
- * Client to server, event `day:submit`. A living Villager picks one private Day action.
- * Candle needs a target; Search and Commune take none.
+ * Client to server, event `day:submit`. Every living player, the Monster included, casts
+ * one ballot for the village's Day action; the last ballot counts. Candle needs a target;
+ * Search and Commune take none.
  */
 export interface DaySubmit {
     action: DayAction;
     /**
-     * Candle only. The player to protect tonight. Not yourself, and not the same player two
-     * nights in a row (checked by the server).
+     * Candle only. The player the voter wants protected tonight. Can't be the player the Candle
+     * protected last night (checked by the server).
      */
     targetId?: string;
 }
@@ -31,12 +32,16 @@ export interface NightSubmit {
 }
 
 /**
- * Client to server, event `power:use`. Monster only, once per game, during Day. Vampire
- * blocks the target's action; Witch plants a fake clue in the target's Search. The
- * Werewolf's double kill goes through `night:submit` instead.
+ * Client to server, event `power:use`. Monster only, once per game, during Day. Takes no
+ * target: the Vampire blocks today's village action, and the Witch fakes today's Search or
+ * Commune result (if Candle wins or nothing happens, she keeps the power). The Werewolf's
+ * double kill goes through `night:submit` instead.
  */
 export interface PowerUse {
-    targetId: string;
+    /**
+     * Deprecated and ignored. Older phones still send it.
+     */
+    targetId?: string;
 }
 
 /**
@@ -76,6 +81,16 @@ export interface VoteSubmit {
      * Seat to banish, or null for Skip.
      */
     targetId: null | string;
+}
+
+/**
+ * Server to all, event `day:progress`. Sent after each accepted Day ballot: how many living
+ * players have voted. Never says what anyone voted.
+ */
+export interface DayProgress {
+    round:  number;
+    voted:  number;
+    voters: number;
 }
 
 /**
@@ -180,13 +195,29 @@ export interface YouJoined {
 }
 
 /**
+ * Server to one, event `you:power`. Sent to the Monster after every Day with its real power
+ * state, so the phone can show or hide the power button. A Witch whose power had no effect
+ * keeps it.
+ */
+export interface YouPower {
+    powerUsed: boolean;
+}
+
+/**
  * Server to one, event `you:rejoined`. Everything this player already knows, sent after
  * they reconnect to their seat. Contains nothing they weren't sent before.
  */
 export interface YouRejoined {
     /**
-     * Who this player lit a candle for last Day, so the phone can grey them out tonight. Null
-     * if none.
+     * Today's ballot while it is Day; null otherwise.
+     */
+    dayOptions?: DayOptions | null;
+    /**
+     * The latest village Day action; null before the first Day ends.
+     */
+    dayResult?: DayResult | null;
+    /**
+     * Who this player voted to protect on the last Day they voted Candle. Null if none.
      */
     lastCandleTargetId: null | string;
     /**
@@ -198,7 +229,7 @@ export interface YouRejoined {
      */
     powerUsed?: boolean;
     /**
-     * Every private Day result this player has received, oldest first.
+     * Every private Search result this player has received, oldest first.
      */
     results: YouResult[];
     room:    RoomState;
@@ -207,6 +238,65 @@ export interface YouRejoined {
      */
     you: YouRole | null;
 }
+
+/**
+ * Server to all, event `day:options`. Sent when Day starts: what is on today's group
+ * ballot. Candle is always on it; Search is off the day after the village's action was
+ * Search.
+ */
+export interface DayOptions {
+    commune: boolean;
+    round:   number;
+    search:  boolean;
+}
+
+/**
+ * Server to all, event `day:result`. Sent when Day ends: the action the village voted for,
+ * shown on the shared screen. A Candle's target is never named. A Search names who
+ * searched; only that phone gets the trait (`you:result`).
+ */
+export interface DayResult {
+    /**
+     * The ballot winner, or none when nobody voted.
+     */
+    action: Action;
+    /**
+     * True when the Vampire blocked today's action.
+     */
+    blocked: boolean;
+    round:   number;
+    /**
+     * Search only, when not blocked: the Villager who searched.
+     */
+    searcherId?: string;
+    /**
+     * Commune only, when not blocked: a trait the Monster does not have.
+     */
+    trait?: Trait;
+}
+
+/**
+ * The ballot winner, or none when nobody voted.
+ */
+export type Action = "search" | "commune" | "candle" | "none";
+
+/**
+ * Commune only, when not blocked: a trait the Monster does not have.
+ *
+ * One costume trait, used in Search and Commune results.
+ */
+export interface Trait {
+    option: TraitOption;
+    slot:   TraitSlot;
+}
+
+/**
+ * Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in
+ * web/public/sprites (#78).
+ */
+export type TraitOption = "top-hat" | "jester-cap" | "crown" | "horned-helmet" | "domino-mask" | "beak-mask" | "pumpkin-mask" | "skull-mask" | "lantern" | "pitchfork" | "umbrella" | "raven";
+
+export type TraitSlot = "hat" | "mask" | "item";
 
 /**
  * Server to all, event `phase:start`. Identical for every player, so a phone screen gives
@@ -229,10 +319,10 @@ export interface PhaseStart {
 export type Phase = "night" | "morning" | "day" | "discussion" | "vote";
 
 /**
- * Server to one, event `you:result`. Private result of the player's Day action, sent when
- * Day ends. Blocked and faked results look exactly like normal ones. Client text: Search
- * null = "You found nothing", Commune null = "The dead are silent", Candle blocked = "The
- * Monster blocked your candle".
+ * Server to one, event `you:result`. Sent at Day end only to the Villager who searched for
+ * the village: one trait the Monster wears (the Witch's fake looks the same). Commune and
+ * Candle results are public in `day:result`; the commune and candle shapes stay only so
+ * older phones still decode.
  */
 export interface YouResult {
     action: DayAction;
@@ -248,22 +338,6 @@ export interface YouResult {
      */
     trait?: Trait | null;
 }
-
-/**
- * One costume trait, used in Search and Commune results.
- */
-export interface Trait {
-    option: TraitOption;
-    slot:   TraitSlot;
-}
-
-/**
- * Any of the 12 options; Trait.slot says which slot. Ids match the sprite names in
- * web/public/sprites (#78).
- */
-export type TraitOption = "top-hat" | "jester-cap" | "crown" | "horned-helmet" | "domino-mask" | "beak-mask" | "pumpkin-mask" | "skull-mask" | "lantern" | "pitchfork" | "umbrella" | "raven";
-
-export type TraitSlot = "hat" | "mask" | "item";
 
 /**
  * Server to all, event `room:state`. Public room snapshot, sent whenever a seat,

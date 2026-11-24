@@ -23,6 +23,9 @@ export const CLIENT_EVENTS = [
 ] as const
 
 export const SERVER_EVENTS = [
+  'day:options',
+  'day:progress',
+  'day:result',
   'error',
   'game:over',
   'morning:reveal',
@@ -30,6 +33,7 @@ export const SERVER_EVENTS = [
   'room:state',
   'vote:reveal',
   'you:joined',
+  'you:power',
   'you:rejoined',
   'you:result',
   'you:role',
