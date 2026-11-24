@@ -93,6 +93,12 @@ export interface Hunch {
 
 const reject = (code: ErrorCode, message: string): Rejection => ({ code, message })
 
+// Rule switches for the balance script (#116). Real games use the defaults.
+export interface RuleOptions {
+  // Search is off the ballot the day after a Search. Default true.
+  searchCooldown?: boolean
+}
+
 export class GameEngine {
   readonly players: Player[]
   readonly monsterSeatId: string
@@ -129,7 +135,11 @@ export class GameEngine {
   // Set once someone wins; the game takes no more events.
   over: GameOver | undefined
 
-  constructor(seatIds: string[], readonly rng: Rng) {
+  constructor(
+    seatIds: string[],
+    readonly rng: Rng,
+    private readonly rules: RuleOptions = {},
+  ) {
     const { costumes, monsterIndex, monsterType } = deal(seatIds.length, rng)
     this.players = seatIds.map((seatId, i) => ({
       seatId,
@@ -235,7 +245,8 @@ export class GameEngine {
   }
 
   dayOptions(): DayOptions {
-    const searchedYesterday = this.lastSearchRound > 0 && this.lastSearchRound === this.round - 1
+    const cooldown = this.rules.searchCooldown ?? true
+    const searchedYesterday = cooldown && this.lastSearchRound > 0 && this.lastSearchRound === this.round - 1
     return { round: this.round, search: !searchedYesterday, commune: true }
   }
 
