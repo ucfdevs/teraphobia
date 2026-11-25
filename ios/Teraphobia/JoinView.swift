@@ -57,7 +57,11 @@ struct JoinView: View {
             }
         }
         // On the NavigationStack, not the Join content, so it runs once at launch and not every time a screen pops back.
-        .task { await auth.refresh() }
+        .task {
+            await auth.refresh()
+            // Back into the game iOS closed the app in. A guest skips the Login page to get there.
+            if client.resume(accessToken: auth.accessToken), auth.user == nil { isGuest = true }
+        }
     }
 
     private var joinForm: some View {
