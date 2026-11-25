@@ -1,5 +1,5 @@
-import { useCallback, useState, type FormEvent } from 'react';
-import { Navigate, Routes, Route, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Navigate, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import logo from './assets/logo.svg';
 import LoginForm from './components/LoginForm';
@@ -59,6 +59,16 @@ export default function App() {
   });
 
   const [session, setSession] = useState<Session | null>(() => getStoredSession());
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // The cached user follows every change (verifying, renaming), so a reload or another tab doesn't see an old copy.
+  useEffect(() => {
+    if (currentUser) localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(currentUser));
+    else localStorage.removeItem(USER_STORAGE_KEY);
+  }, [currentUser]);
 
   // Auth form states
   const [name, setName] = useState('');
@@ -254,6 +264,65 @@ export default function App() {
     resetForm();
     navigate('/signin');
   };
+
+  // Reloads the signed-in user from the server, so the dashboard sees changes made elsewhere, like verifying the
+  // email from the link in another tab (#129). An expired access token is refreshed once first. Calls share one
+  // request in flight: refresh tokens rotate, so two refreshes at once would sign the user out.
+  const userRequest = useRef<Promise<void> | null>(null);
+  const refreshUser = () => {
+    userRequest.current ??= (async () => {
+      const current = sessionRef.current;
+      if (!current) return;
+      const me = (token: string) => fetch('/api/users/me', { headers: { Authorization: `Bearer ${token}` } });
+      let res = await me(current.accessToken);
+      if (res.status === 401) {
+        const refreshed = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
+        });
+        if (!refreshed.ok) {
+          handleUnauthorized();
+          return;
+        }
+        const tokens = await refreshed.json();
+        const next = { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, issuedAt: Date.now() };
+        sessionRef.current = next;
+        persistSession(next);
+        res = await me(next.accessToken);
+      }
+      if (!res.ok) return;
+      const data = await res.json();
+      setCurrentUser({ id: data.id, displayName: data.displayName, email: data.email, emailVerified: data.emailVerified });
+    })()
+      .catch(() => {
+        // Offline or the server is down: keep showing the cached user.
+      })
+      .finally(() => {
+        userRequest.current = null;
+      });
+    return userRequest.current;
+  };
+  const refreshUserRef = useRef(refreshUser);
+  useEffect(() => {
+    refreshUserRef.current = refreshUser;
+  });
+
+  // On the dashboard, reload the user when it opens and whenever the tab comes back into view.
+  const onDashboard = useLocation().pathname === '/app';
+  useEffect(() => {
+    if (!onDashboard) return;
+    const reload = () => {
+      if (document.visibilityState === 'visible') void refreshUserRef.current();
+    };
+    reload();
+    window.addEventListener('focus', reload);
+    document.addEventListener('visibilitychange', reload);
+    return () => {
+      window.removeEventListener('focus', reload);
+      document.removeEventListener('visibilitychange', reload);
+    };
+  }, [onDashboard]);
 
   const goHome = () => {
     navigate('/');
