@@ -50,6 +50,12 @@ extension RoomClient {
         case let screen:
             guard let phase = Phase(rawValue: screen) else { return nil }
             client.phase = PhaseStart(endsAt: 0, phase: phase, round: 1, serverNow: 0)
+            // "-no-search" opens Day the day after a Search, so the Search card is greyed out.
+            let searchedYesterday = arguments.contains("-no-search")
+            client.dayOptions = DayOptions(commune: true, round: 1, search: !searchedYesterday)
+            client.dayProgress = DayProgress(round: 1, voted: 2, voters: 5)
+            // Discussion: this phone searched for the village and found the crown.
+            client.dayResult = DayResult(action: .search, blocked: false, round: 1, searcherID: you.seatID, trait: nil)
             client.result = YouResult(action: .search, candleBlocked: nil, round: 1, trait: Trait(option: .crown, slot: .hat))
         }
         return client

@@ -15,9 +15,14 @@ struct ClueText {
             case .candle: return result.candleBlocked == true ? "The Monster blocked your candle." : "Your candle burns for tonight."
             }
         }
+        return Self.sentence(for: trait, commune: result.action == .commune)
+    }
+
+    // "The Monster wears the crown." for a Search, or the dead's whisper about a trait it lacks for a Commune.
+    static func sentence(for trait: Trait, commune: Bool) -> String {
         let name = trait.option.rawValue.replacingOccurrences(of: "-", with: " ")
         let held = trait.slot == .item
-        if result.action == .commune {
+        if commune {
             return "The dead whisper: the Monster doesn't \(held ? "carry" : "wear") the \(name)."
         }
         return "The Monster \(held ? "carries" : "wears") the \(name)."
