@@ -16,6 +16,7 @@ import HostScreenPreview from './host/HostScreenPreview';
 import GoogleSignInButton from './components/GoogleSignInButton';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import { issuedAtFromToken } from './lib/token';
 
 interface RoleItem {
   id: number;
@@ -42,7 +43,7 @@ function getStoredSession(): Session | null {
   return {
     accessToken,
     refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) ?? '',
-    issuedAt: Date.now(),
+    issuedAt: issuedAtFromToken(accessToken),
   };
 }
 
