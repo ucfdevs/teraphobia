@@ -8,10 +8,10 @@ final class TeraphobiaUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    private func launch(_ screen: String? = nil) -> XCUIApplication {
+    private func launch(_ screen: String? = nil, _ extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         if let screen {
-            app.launchArguments = ["-screen", screen]
+            app.launchArguments = ["-screen", screen] + extra
         }
         app.launch()
         return app
@@ -76,6 +76,38 @@ final class TeraphobiaUITests: XCTestCase {
         candle.tap()
         XCTAssertTrue(candle.isSelected)
         XCTAssertTrue(button("Cameron", in: app).waitForExistence(timeout: 2))
+        try audit(app)
+    }
+
+    // The Villager's and the Monster's ballots are the same three cards, and a new vote replaces the old one.
+    func testBallotOptionsForVillagerAndWitch() throws {
+        for extra in [[], ["-monster", "witch"]] {
+            let app = launch("day", extra)
+            XCTAssertTrue(app.navigationBars["Day 1"].waitForExistence(timeout: 5))
+
+            let search = button("Search the crime scene", in: app)
+            let commune = button("Commune with the dead", in: app)
+            XCTAssertTrue(button("Light a candle", in: app).exists)
+            search.tap()
+            XCTAssertTrue(search.isSelected)
+            commune.tap()
+            XCTAssertTrue(commune.isSelected)
+            XCTAssertFalse(search.isSelected)
+            XCTAssertTrue(text("2 of 5 have voted", in: app).exists)
+            try audit(app)
+            app.terminate()
+        }
+    }
+
+    func testSearchIsGreyedTheDayAfterASearch() throws {
+        let app = launch("day", ["-no-search"])
+        XCTAssertTrue(app.navigationBars["Day 1"].waitForExistence(timeout: 5))
+
+        let search = button("Search the crime scene", in: app)
+        XCTAssertFalse(search.isEnabled)
+        // VoiceOver reads the reason as the card's value.
+        XCTAssertEqual(search.value as? String, "Searched yesterday")
+        XCTAssertTrue(button("Commune with the dead", in: app).isEnabled)
         try audit(app)
     }
 

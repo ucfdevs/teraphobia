@@ -29,6 +29,13 @@ final class RoomClient {
     // True when the phase came back from a rejoin rather than starting, so its sound doesn't play again.
     var phaseFromRejoin = false
     var result: YouResult?
+    // The village's Day vote (#102): today's ballot, how many have voted, and the latest public result.
+    var dayOptions: DayOptions?
+    var dayProgress: DayProgress?
+    var dayResult: DayResult?
+    // This phone's own ballot and the round it was cast in. The server keeps the last one sent.
+    var ballot: DaySubmit?
+    var ballotRound: Int?
     var powerUsed = false
     var nightVictims = 0
     var gameError: String?
@@ -42,6 +49,8 @@ final class RoomClient {
     // Goes up each time someone dies or is banished while this phone watches, for the death sting.
     var deaths = 0
 
+    // The ballot the server held before the last cast, put back if it refuses the new one.
+    private var ballotBeforeCast: DaySubmit?
     private var manager: SocketManager?
     // From you:joined. Sent back in room:join after a drop to get the same seat.
     private var rejoinToken: String?
@@ -87,6 +96,11 @@ final class RoomClient {
         phaseLengths = [:]
         deaths = 0
         result = nil
+        dayOptions = nil
+        dayProgress = nil
+        dayResult = nil
+        ballot = nil
+        ballotRound = nil
         powerUsed = false
         nightVictims = 0
         gameError = nil
@@ -99,6 +113,15 @@ final class RoomClient {
 
     func emit(_ event: String, _ value: some Encodable) {
         manager?.defaultSocket.emit(event, Self.payload(value))
+    }
+
+    // A Day ballot. Sending another replaces it, until Day ends.
+    func cast(_ submit: DaySubmit) {
+        // Only today's ballot can be put back; yesterday's no longer counts.
+        ballotBeforeCast = ballotRound == phase?.round ? ballot : nil
+        ballot = submit
+        ballotRound = phase?.round
+        emit("day:submit", submit)
     }
 
     // Skip is "targetId": null, but VoteSubmit(targetID: nil) encodes as {}, which the server refuses. So this payload is built by hand.
@@ -178,8 +201,18 @@ final class RoomClient {
             phase = next
             gameError = nil
         }
+        // Only the Villager who searched for the village gets a you:result.
         socket.on("you:result") { [weak self] data, _ in
             self?.result = Self.decode(YouResult.self, data)
+        }
+        socket.on("day:options") { [weak self] data, _ in
+            self?.dayOptions = Self.decode(DayOptions.self, data)
+        }
+        socket.on("day:progress") { [weak self] data, _ in
+            self?.dayProgress = Self.decode(DayProgress.self, data)
+        }
+        socket.on("day:result") { [weak self] data, _ in
+            self?.dayResult = Self.decode(DayResult.self, data)
         }
         socket.on(clientEvent: .reconnect) { [weak self] _, _ in
             self?.reconnecting = true
@@ -195,6 +228,8 @@ final class RoomClient {
                 phaseStartedAt = startOfPhase(next.phase)
             }
             result = state.results.last
+            dayOptions = state.dayOptions
+            dayResult = state.dayResult
             if let used = state.powerUsed { powerUsed = used }
             reconnecting = false
         }
@@ -214,6 +249,8 @@ final class RoomClient {
             // Once in the room, a refused pick or action is shown on the game screen.
             if joined {
                 gameError = serverError?.message
+                // A refused Day ballot didn't replace the one before it, so the screen goes back to that one.
+                if serverError?.event == "day:submit" { ballot = ballotBeforeCast }
                 return
             }
             // Name problems go under the name field; anything else under the Join button.

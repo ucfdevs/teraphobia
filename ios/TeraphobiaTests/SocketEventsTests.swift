@@ -50,6 +50,54 @@ struct SocketEventsTests {
         #expect(error.code == .nameTaken)
     }
 
+    @Test func dayOptionsSayWhatIsOnTheBallot() throws {
+        let options = try decode(DayOptions.self, #"{"round":3,"search":false,"commune":true}"#)
+        #expect(options == DayOptions(commune: true, round: 3, search: false))
+    }
+
+    @Test func dayProgressCountsVotesOnly() throws {
+        let progress = try decode(DayProgress.self, #"{"round":3,"voted":4,"voters":6}"#)
+        #expect(progress == DayProgress(round: 3, voted: 4, voters: 6))
+    }
+
+    @Test func daySearchResultNamesTheSearcherButNoTrait() throws {
+        let result = try decode(DayResult.self, #"{"round":2,"action":"search","blocked":false,"searcherId":"s3"}"#)
+        #expect(result.action == .search)
+        #expect(result.searcherID == "s3")
+        #expect(result.trait == nil)
+    }
+
+    @Test func dayCommuneResultCarriesThePublicTrait() throws {
+        let result = try decode(DayResult.self, #"{"round":2,"action":"commune","blocked":false,"trait":{"slot":"mask","option":"skull-mask"}}"#)
+        #expect(result.trait == Trait(option: .skullMask, slot: .mask))
+    }
+
+    @Test func dayResultCanBeBlockedOrEmpty() throws {
+        let blocked = try decode(DayResult.self, #"{"round":2,"action":"candle","blocked":true}"#)
+        let none = try decode(DayResult.self, #"{"round":2,"action":"none","blocked":false}"#)
+        #expect(blocked.blocked)
+        #expect(none.action == .none)
+    }
+
+    @Test func rejoinDuringDayCarriesTheBallotAndLastResult() throws {
+        let rejoined = try decode(YouRejoined.self, """
+        {"room":{"code":"ABCD","hostConnected":true,"preset":"normal","status":"playing","seats":[]},
+         "phase":{"phase":"day","round":3,"endsAt":1794814190000,"serverNow":1794814160000},
+         "you":null,"results":[],"lastCandleTargetId":null,
+         "dayOptions":{"round":3,"search":false,"commune":true},
+         "dayResult":{"round":2,"action":"search","blocked":false,"searcherId":"s1"}}
+        """)
+        #expect(rejoined.dayOptions?.search == false)
+        #expect(rejoined.dayResult?.searcherID == "s1")
+    }
+
+    @Test func candleBallotSendsTheTargetUnderServerKeys() throws {
+        let data = try JSONEncoder().encode(DaySubmit(action: .candle, targetID: "s2"))
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        #expect(json?["action"] as? String == "candle")
+        #expect(json?["targetId"] as? String == "s2")
+    }
+
     @Test func nightPickUsesServerKeys() throws {
         let data = try JSONEncoder().encode(NightSubmit(victimIDS: ["s2"], suspectID: nil))
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]

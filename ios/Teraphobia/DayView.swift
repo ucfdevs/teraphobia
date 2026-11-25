@@ -1,7 +1,8 @@
 import SwiftUI
 
-// Villagers pick Search, Commune, or Candle. The Monster sees the same three cards as cover
-// (they send nothing), a rotating flavor message, and its power button until it's used.
+// The village's Day vote (#102): every living player, the Monster included, votes for one action
+// the whole village takes. A vote can change until Day ends. The Monster also sees a rotating flavor
+// message and its power button until it's used.
 // Every card looks and sounds the same for every role, so a glance at the Monster's phone gives nothing away.
 struct DayView: View {
     let you: YouRole
@@ -9,16 +10,33 @@ struct DayView: View {
     let round: Int
     let deadline: Date
     let powerUsed: Bool
-    let sendAction: (DaySubmit) -> Void
+    // This phone's vote today, or nil before it votes.
+    let ballot: DaySubmit?
+    let options: BallotOptions
+    let progress: DayProgress?
+    let cast: (DaySubmit) -> Void
     let usePower: (PowerUse) -> Void
 
-    @State private var action: DayAction?
-    @State private var candleTarget: String?
+    // Candle tapped but nobody picked to protect yet. A Candle vote isn't sent until it has a target.
+    @State private var choosingCandle = false
     @State private var choosingPowerTarget = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isMonster: Bool { you.role == .monster }
+
+    // The card shown as picked: a Candle still waiting for its target, or the vote the server has.
+    private var picked: DayAction? { choosingCandle ? .candle : ballot?.action }
+
+    private var candleTarget: String? { ballot?.action == .candle ? ballot?.targetID : nil }
+
+    // A Candle waiting for its target hasn't replaced the vote the server already has.
+    private var noteText: String {
+        if choosingCandle && ballot?.action != .candle {
+            return ballot == nil ? "Pick who to protect to cast your vote." : "Pick who to protect. Your earlier vote counts until then."
+        }
+        return ballot == nil ? "The village does whatever gets the most votes." : "Locked in. You can change your vote until Day ends."
+    }
 
     // Vampire and Witch powers are used during Day. The Werewolf's is at Night.
     private var showPower: Bool {
@@ -33,17 +51,17 @@ struct DayView: View {
     var body: some View {
         PhaseLayout(title: "Day \(round)", deadline: deadline, you: you, heading: "Daylight, for now", look: look) {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Pick one")
+                SectionHeading("Vote for one")
                 // Not in a GlassGroup: inside one, the selected card's orange border blends into the glass and disappears.
-                actionCard(.search, "Search the crime scene", detail: "Learn one thing the Monster wears or carries.",
-                           icon: "magnifyingglass")
-                actionCard(.commune, "Commune with the dead", detail: "Learn one thing the Monster doesn't have.",
-                           icon: "moon.stars")
-                actionCard(.candle, "Light a candle", detail: "Protect another player from tonight's kill.",
-                           icon: "flame.fill")
+                actionCard(.search, "Search the crime scene",
+                           detail: "One Villager learns something the Monster wears or carries.", icon: "magnifyingglass")
+                actionCard(.commune, "Commune with the dead",
+                           detail: "Everyone learns something the Monster doesn't have.", icon: "moon.stars")
+                actionCard(.candle, "Light a candle",
+                           detail: "Protect a player from tonight's kill.", icon: "flame.fill")
             }
 
-            if action == .candle {
+            if picked == .candle {
                 PlayerPicker(header: "Protect who tonight?", seats: seats, you: you,
                              picked: candleTarget.map { [$0] } ?? [], onPick: lightCandle)
                     .transition(.opacity)
@@ -55,10 +73,18 @@ struct DayView: View {
                     .font(.title2)
                     .foregroundStyle(Theme.moon)
             } content: {
-                if isMonster {
-                    FlavorMessage()
-                } else {
-                    Text(lockedIn ? "Locked in. Your result comes when Day ends." : "Your result comes when Day ends.")
+                VStack(alignment: .leading, spacing: 4) {
+                    if isMonster {
+                        FlavorMessage()
+                    } else {
+                        Text(noteText)
+                    }
+                    if let progress, progress.round == round {
+                        Text("\(progress.voted) of \(progress.voters) have voted")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.mutedText)
+                            .contentTransition(.numericText())
+                    }
                 }
             }
 
@@ -79,14 +105,8 @@ struct DayView: View {
                 }
             }
         }
-        .animation(reduceMotion ? nil : .spring(duration: 0.35), value: action)
+        .animation(reduceMotion ? nil : .spring(duration: 0.35), value: picked)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: choosingPowerTarget)
-    }
-
-    // A Candle only counts once it has someone to protect.
-    private var lockedIn: Bool {
-        guard let action else { return false }
-        return action != .candle || candleTarget != nil
     }
 
     private var powerTitle: String {
@@ -94,16 +114,17 @@ struct DayView: View {
     }
 
     private func actionCard(_ value: DayAction, _ title: String, detail: String, icon: String) -> some View {
-        let selected = action == value
+        let selected = picked == value
+        let reason = options.reason(for: value)
         let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
         return Button {
-            // Same sound for every role, before anything role-specific happens.
+            // Same sound for every role.
             SoundEngine.shared.play(.pick)
-            action = value
-            candleTarget = nil
-            // A Candle is only sent once it has a target.
-            if !isMonster && value != .candle {
-                sendAction(DaySubmit(action: value, targetID: nil))
+            if value == .candle {
+                choosingCandle = true
+            } else {
+                choosingCandle = false
+                cast(DaySubmit(action: value, targetID: nil))
             }
         } label: {
             HStack(spacing: 14) {
@@ -116,7 +137,7 @@ struct DayView: View {
                     Text(title)
                         .font(.headline)
                         .foregroundStyle(Theme.text)
-                    Text(detail)
+                    Text(reason ?? detail)
                         .font(.subheadline)
                         .foregroundStyle(Theme.mutedText)
                 }
@@ -135,23 +156,25 @@ struct DayView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .surface(.card, selected: selected, interactive: true)
+            .surface(.card, selected: selected, interactive: reason == nil)
             .contentShape(shape)
+            .opacity(reason == nil ? 1 : 0.45)
             .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.4), value: selected)
         }
         .buttonStyle(CardPressStyle())
+        .disabled(reason != nil)
         .sensoryFeedback(.selection, trigger: selected)
-        // The icons and checkmark are decoration; the Selected trait says it's picked.
+        // The icons and checkmark are decoration; the Selected trait says it's picked. A greyed card's reason is
+        // its value, not a hint, because VoiceOver users can turn hints off.
         .accessibilityLabel(title)
-        .accessibilityHint(detail)
+        .accessibilityValue(reason ?? "")
+        .accessibilityHint(reason == nil ? detail : "")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func lightCandle(_ seatID: String) {
-        candleTarget = seatID
-        if !isMonster {
-            sendAction(DaySubmit(action: .candle, targetID: seatID))
-        }
+        choosingCandle = false
+        cast(DaySubmit(action: .candle, targetID: seatID))
     }
 }
 
@@ -169,7 +192,7 @@ struct FlavorMessage: View {
     }
 }
 
-// A short private note on a card: art on the left, words on the right. The Villager's and the Monster's
+// A short note on a card: art on the left, words on the right. The Villager's and the Monster's
 // versions use this same card, so the two screens look alike from across the table.
 private struct NoteCard<Art: View, Content: View>: View {
     var artWidth: CGFloat = 32
@@ -194,51 +217,42 @@ private struct NoteCard<Art: View, Content: View>: View {
     }
 }
 
-// The private Day result, shown during Discussion. The Monster sees a flavor message in the same card.
+// The village's Day result, shown during Discussion. Every phone shows the public result; the Villager
+// who searched also sees their private clue in the same card.
 struct ResultView: View {
     let you: YouRole
-    let round: Int
     let deadline: Date
-    let result: YouResult?
+    let outcome: DayOutcome
 
     private let spriteSize: CGFloat = 96
 
     var body: some View {
         PhaseLayout(title: "Discussion", deadline: deadline, you: you, heading: "Who's lying?") {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeading("Your clue")
+                SectionHeading("Today's action")
                 NoteCard(artWidth: spriteSize) {
                     // The Stranger fills the spot when there's no trait to show, so every card has the same shape.
-                    if you.role != .monster, let clueTrait {
-                        TraitView(trait: clueTrait, size: spriteSize, boxed: false)
+                    if let trait = outcome.trait {
+                        TraitView(trait: trait, size: spriteSize, boxed: false)
                     } else {
                         StrangerView(size: spriteSize)
                     }
                 } content: {
-                    Group {
-                        if you.role == .monster {
-                            FlavorMessage()
-                        } else {
-                            Text(ClueText(result: result, round: round).text)
-                        }
-                    }
-                    .font(.display(.title3))
+                    Text(outcome.text)
+                        .font(.display(.title3))
                 }
             }
         }
-    }
-
-    // Only Search and Commune results carry a trait.
-    private var clueTrait: Trait? {
-        guard let result, result.round == round else { return nil }
-        return result.trait
     }
 }
 
 #Preview {
     NavigationStack {
         DayView(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: .vampire, role: .monster, seatID: "seat0"),
-                seats: PublicSeat.previews, round: 1, deadline: .now.addingTimeInterval(30), powerUsed: false,
-                sendAction: { _ in }, usePower: { _ in })
+                seats: PublicSeat.previews, round: 2, deadline: .now.addingTimeInterval(30), powerUsed: false,
+                ballot: DaySubmit(action: .commune, targetID: nil),
+                options: BallotOptions(options: DayOptions(commune: true, round: 2, search: false), round: 2),
+                progress: DayProgress(round: 2, voted: 3, voters: 5),
+                cast: { _ in }, usePower: { _ in })
     }
 }

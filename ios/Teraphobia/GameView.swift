@@ -32,13 +32,18 @@ struct GameView: View {
                 case .day:
                     DayView(you: you, seats: seats, round: phase.round, deadline: client.phaseDeadline,
                             powerUsed: client.powerUsed,
-                            sendAction: { client.emit("day:submit", $0) },
+                            ballot: client.ballotRound == phase.round ? client.ballot : nil,
+                            options: BallotOptions(options: client.dayOptions, round: phase.round),
+                            progress: client.dayProgress,
+                            cast: client.cast,
                             usePower: { power in
                                 client.emit("power:use", power)
                                 client.powerUsed = true
                             })
                 case .discussion:
-                    ResultView(you: you, round: phase.round, deadline: client.phaseDeadline, result: client.result)
+                    ResultView(you: you, deadline: client.phaseDeadline,
+                               outcome: DayOutcome(result: client.dayResult, search: client.result, round: phase.round,
+                                                   seats: seats, seatID: client.seatID))
                 case .vote:
                     VoteView(you: you, seats: seats, deadline: client.phaseDeadline,
                              lockedIn: client.votedRound == phase.round, votedTargetID: client.votedTargetID) { targetID in
