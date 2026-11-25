@@ -236,8 +236,11 @@ export function createSocketServer(httpServer: HttpServer, options: SocketServer
     room.hostConnected = true
     socket.join(channel(room.code))
     broadcast(room)
-    // Timers paused while the host screen was away pick up where they stopped.
-    room.runner?.resume()
+    // Timers paused while the host screen was away pick up where they stopped, and resume() tells the room.
+    // A tab that took over from a still-connected one never paused them, so it gets the current phase itself.
+    const { runner } = room
+    if (runner?.paused) runner.resume()
+    else if (runner && !room.game?.over) emitEvent(socket, 'phase:start', runner.phaseStart())
   }
 
   // Puts this socket in the seat, taking it from an older connection if there is one, and gives the phone

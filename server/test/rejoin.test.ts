@@ -204,4 +204,18 @@ describe('host pause', () => {
     clock.advance(1)
     await game.phones[0].next('morning:reveal')
   })
+
+  it('sends the current phase to a new host tab that takes over without a pause (#127)', async () => {
+    const game = await startGame(harness, hostRoom, 4)
+    clock.advance(10_000)
+
+    // The old tab is still connected, so the timers never pause and resume() sends nothing.
+    const tab = await harness.connect({ token: signAccessToken(HOST_ID) })
+    expect(await tab.next('room:state')).toMatchObject({ hostConnected: true, status: 'playing' })
+    expect(await tab.next('phase:start')).toEqual({ phase: 'night', round: 1, endsAt: clock.time + 20_000, serverNow: clock.time })
+
+    // Only the new tab gets it; phones keep their one phase:start for Night 1.
+    await game.phones[0].flush()
+    expect(game.phones[0].all('phase:start')).toHaveLength(1)
+  })
 })

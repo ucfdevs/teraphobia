@@ -37,6 +37,9 @@ export default function HostScreen({ session, onSessionChange, onExit }: Props) 
   const sessionRef = useRef(session);
   const refreshing = useRef<Promise<string> | null>(null);
   const [code, setCode] = useState<string | null>(null);
+  // On load the screen first reconnects to the host's live room, if the server still has one (#127): a reload
+  // mid-game must not offer Create, which would replace the room and end the game.
+  const [resuming, setResuming] = useState(true);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -90,14 +93,33 @@ export default function HostScreen({ session, onSessionChange, onExit }: Props) 
     }
   };
 
+  const playAgain = () => {
+    setResuming(false);
+    setCode(null);
+  };
+
+  if (resuming) {
+    return <LiveRoom key="resume" getToken={getToken} onPlayAgain={playAgain} onNoRoom={() => setResuming(false)} />;
+  }
   if (!code) return <CreateRoom busy={creating} error={createError} onCreate={createRoom} onExit={onExit} />;
   // Keyed by code, so Play again starts a fresh socket for the new room.
-  return <LiveRoom key={code} getToken={getToken} onPlayAgain={() => setCode(null)} />;
+  return <LiveRoom key={code} getToken={getToken} onPlayAgain={playAgain} />;
 }
 
-function LiveRoom({ getToken, onPlayAgain }: { getToken(): Promise<string>; onPlayAgain(): void }) {
+interface LiveRoomProps {
+  getToken(): Promise<string>;
+  onPlayAgain(): void;
+  // Called when the server has no room for this host, so the screen can offer Create instead.
+  onNoRoom?(): void;
+}
+
+function LiveRoom({ getToken, onPlayAgain, onNoRoom }: LiveRoomProps) {
   const game = useHostSocket(getToken);
   const { room, phase, error, clearError } = game;
+
+  useEffect(() => {
+    if (error?.code === 'room_not_found') onNoRoom?.();
+  }, [error, onNoRoom]);
 
   // Errors fade after a few seconds; most are one-off refusals like "needs 4 players".
   useEffect(() => {
@@ -113,8 +135,11 @@ function LiveRoom({ getToken, onPlayAgain }: { getToken(): Promise<string>; onPl
     screen = <VoteRevealScreen room={room} vote={game.vote} />;
   } else if (game.gameOver) {
     screen = <GameOverScreen room={room} result={game.gameOver} onPlayAgain={onPlayAgain} />;
-  } else if (room.status === 'lobby' || !phase) {
+  } else if (room.status === 'lobby') {
     screen = <Lobby room={room} onKick={game.kick} onStart={game.start} />;
+  } else if (!phase) {
+    // A reconnecting host gets room:state just before the current phase:start; don't flash the Lobby's Start.
+    screen = <p className="host-lead" role="status">Rejoining the game...</p>;
   } else if (phase.phase === 'night') {
     screen = <NightScreen phase={phase} clockOffsetMs={game.clockOffsetMs} />;
   } else if (phase.phase === 'morning') {
