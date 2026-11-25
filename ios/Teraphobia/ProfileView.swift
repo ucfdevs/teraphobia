@@ -160,6 +160,14 @@ struct ProfileView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.mutedText)
             }
+
+            // Google-only accounts have no password to change.
+            if profile.signInMethods.contains("password") {
+                NavigationLink("Change password") {
+                    ChangePasswordView(auth: auth)
+                }
+                .buttonStyle(.quiet)
+            }
         }
     }
 
