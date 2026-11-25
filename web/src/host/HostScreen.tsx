@@ -106,9 +106,9 @@ function LiveRoom({ getToken, onPlayAgain }: { getToken(): Promise<string>; onPl
   } else if (phase.phase === 'morning') {
     screen = <MorningScreen room={room} phase={phase} morning={game.morning} clockOffsetMs={game.clockOffsetMs} />;
   } else if (phase.phase === 'day') {
-    screen = <DayScreen room={room} phase={phase} clockOffsetMs={game.clockOffsetMs} />;
+    screen = <DayScreen room={room} phase={phase} clockOffsetMs={game.clockOffsetMs} dayProgress={game.dayProgress} dayResult={game.dayResult} />;
   } else {
-    screen = <DiscussionScreen room={room} phase={phase} clockOffsetMs={game.clockOffsetMs} />;
+    screen = <DiscussionScreen room={room} phase={phase} clockOffsetMs={game.clockOffsetMs} dayResult={game.dayResult} />;
   }
 
   return (

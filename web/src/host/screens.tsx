@@ -5,12 +5,15 @@
 import { useEffect, useState } from 'react';
 import type {
   Costume,
+  DayProgress,
+  DayResult,
   GameOver,
   MorningReveal,
   PhaseStart,
   Preset,
   PublicSeat,
   RoomState,
+  Trait,
   VoteReveal,
 } from '../../../shared/generated/SocketEvents';
 
@@ -226,13 +229,125 @@ function SeatCard({ seat }: { seat: PublicSeat }) {
     </li>
   );
 }
+const SLOT_LABELS: Record<Trait['slot'], string> = {
+  hat: 'Hat',
+  mask: 'Mask',
+  item: 'Held item',
+};
 
-export function DayScreen({ room, phase, clockOffsetMs }: { room: RoomState; phase: PhaseStart; clockOffsetMs: number }) {
+export function DayResultBanner({
+  room,
+  dayResult,
+}: {
+  room: RoomState;
+  dayResult: DayResult;
+}) {
+  if (dayResult.blocked) {
+    return (
+      <section className="host-card host-day-result is-blocked" aria-live="polite">
+        <span className="host-badge">Today&apos;s Group Action</span>
+        <h3 className="host-day-result-title">The Monster blocked today&apos;s action</h3>
+        <p className="host-subtle">
+          No clue was uncovered and no candle was lit.
+        </p>
+      </section>
+    );
+  }
+
+  if (dayResult.action === 'search') {
+    const searcherName = dayResult.searcherId
+      ? nameOf(room, dayResult.searcherId)
+      : 'A villager';
+    return (
+      <section className="host-card host-day-result" aria-live="polite">
+        <span className="host-badge">Today&apos;s Group Action: Search</span>
+        <h3 className="host-day-result-title">
+          {searcherName} searched the crime scene
+        </h3>
+        <p className="host-subtle">
+          They uncovered a private clue about the Monster&apos;s costume.
+        </p>
+      </section>
+    );
+  }
+
+  if (dayResult.action === 'commune' && dayResult.trait) {
+    return (
+      <section className="host-card host-day-result is-commune" aria-live="polite">
+        <span className="host-badge">Today&apos;s Group Action: Commune</span>
+        <h3 className="host-day-result-title">
+          The Monster does NOT have:{' '}
+          <strong>
+            {SLOT_LABELS[dayResult.trait.slot]} &mdash; {dayResult.trait.option}
+          </strong>
+        </h3>
+        <p className="host-subtle">
+          The spirits ruled out this costume trait for everyone.
+        </p>
+      </section>
+    );
+  }
+
+  if (dayResult.action === 'candle') {
+    return (
+      <section className="host-card host-day-result" aria-live="polite">
+        <span className="host-badge">Today&apos;s Group Action: Candle</span>
+        <h3 className="host-day-result-title">A protective candle was lit</h3>
+        <p className="host-subtle">
+          One villager is shielded from tonight&apos;s attack.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="host-card host-day-result" aria-live="polite">
+      <span className="host-badge">Today&apos;s Group Action</span>
+      <h3 className="host-day-result-title">No group action was taken</h3>
+      <p className="host-subtle">
+        The village took no action before dusk fell.
+      </p>
+    </section>
+  );
+}
+
+export function DayScreen({
+  room,
+  phase,
+  clockOffsetMs,
+  dayProgress,
+  dayResult,
+}: {
+  room: RoomState;
+  phase: PhaseStart;
+  clockOffsetMs: number;
+  dayProgress: DayProgress | null;
+  dayResult: DayResult | null;
+}) {
+  const livingVoters = room.seats.filter((s) => s.lifeStatus === 'alive').length;
+  const votedCount = dayProgress?.voted ?? 0;
+  const totalVoters = dayProgress?.voters ?? livingVoters;
+
   return (
     <section className="host-stage" aria-labelledby="phase-title">
       <PhaseHeader title="Day" phase={phase} clockOffsetMs={clockOffsetMs} />
-      <p className="host-lead">Villagers: Search, Commune, or light a Candle on your phone.</p>
-      <ul className="host-seats">
+
+      <div className="host-day-status">
+        <p className="host-lead">
+          {dayResult
+            ? 'Day votes are in.'
+            : 'Villagers: Search, Commune, or light a Candle on your phone.'}
+        </p>
+        {!dayResult && (
+          <div className="host-badge host-day-progress" aria-live="polite">
+            {votedCount} of {totalVoters} voted
+          </div>
+        )}
+      </div>
+
+      {dayResult && <DayResultBanner room={room} dayResult={dayResult} />}
+
+      <ul className="host-grid">
         {room.seats.map((seat) => (
           <SeatCard key={seat.seatId} seat={seat} />
         ))}
@@ -241,16 +356,35 @@ export function DayScreen({ room, phase, clockOffsetMs }: { room: RoomState; pha
   );
 }
 
-export function DiscussionScreen({ room, phase, clockOffsetMs }: { room: RoomState; phase: PhaseStart; clockOffsetMs: number }) {
+export function DiscussionScreen({
+  room,
+  phase,
+  clockOffsetMs,
+  dayResult,
+}: {
+  room: RoomState;
+  phase: PhaseStart;
+  clockOffsetMs: number;
+  dayResult: DayResult | null;
+}) {
   const voting = phase.phase === 'vote';
   return (
     <section className="host-stage" aria-labelledby="phase-title">
-      <PhaseHeader title={voting ? 'Vote' : 'Discussion'} phase={phase} clockOffsetMs={clockOffsetMs} />
+      <PhaseHeader
+        title={voting ? 'Vote' : 'Discussion'}
+        phase={phase}
+        clockOffsetMs={clockOffsetMs}
+      />
+      {dayResult && <DayResultBanner room={room} dayResult={dayResult} />}
       <p className="host-lead">
-        {voting ? 'Vote on your phone: banish a player, or Skip.' : 'Share your clues, or lie about them. Who is the Monster?'}
+        {voting
+          ? 'Vote on your phone: banish a player, or Skip.'
+          : 'Share your clues, or lie about them. Who is the Monster?'}
       </p>
-      <ul className="host-seats">
-        {room.seats.map((seat) => <SeatCard key={seat.seatId} seat={seat} />)}
+      <ul className="host-grid">
+        {room.seats.map((seat) => (
+          <SeatCard key={seat.seatId} seat={seat} />
+        ))}
       </ul>
     </section>
   );
