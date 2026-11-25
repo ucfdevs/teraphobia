@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { MorningReveal, PhaseStart, RoomState } from '../../../shared/generated/SocketEvents';
-import { DayScreen, MorningScreen, NightScreen } from './screens';
+import type { DayProgress, DayResult, MorningReveal, PhaseStart, RoomState } from '../../../shared/generated/SocketEvents';
+import { DayScreen, DiscussionScreen, MorningScreen, NightScreen } from './screens';
 
 const mockRoom: RoomState = {
     code: 'MOCK',
@@ -44,12 +44,26 @@ function makeMockPhaseStart(phase: PhaseStart['phase']): PhaseStart {
     return { phase, round: 1, serverNow, endsAt: serverNow + 60_000 };
 }
 
-export default function HostScreenPreview() {
-    const [phase, setPhase] = useState(() => makeMockPhaseStart('night'));
-    const [morning, setMorning] = useState<MorningReveal>({
+const SAMPLE_DAY_PROGRESS: DayProgress = {
+    round: 1,
+    voted: 2,
+    voters: 3,
+};
+
+const SAMPLE_DAY_RESULT: DayResult = {
+    round: 1,
+    action: 'commune',
+    blocked: false,
+    trait: { slot: 'hat', option: 'top-hat' },
+};
+
+export function HostScreenPreview() {
+    const [phase, setPhase] = useState<PhaseStart>(() => makeMockPhaseStart('day'));
+    const [morning, setMorning] = useState<MorningReveal>(() => ({
         round: 1,
         deadIds: ['seat-2'],
-    });
+    }));
+    const [showDayResult, setShowDayResult] = useState(false);
 
     const selectPhase = (nextPhase: PhaseStart['phase']) => {
         setPhase(makeMockPhaseStart(nextPhase));
@@ -57,7 +71,7 @@ export default function HostScreenPreview() {
 
     const toggleMorningReveal = () => {
         setMorning((current) => ({
-            ...current,
+            round: 1,
             deadIds: current.deadIds.length === 0 ? ['seat-2'] : [],
         }));
     };
@@ -65,7 +79,7 @@ export default function HostScreenPreview() {
     return (
         <div className="host-root">
             <div className="host-preview-controls" role="group" aria-label="Preview game screens">
-                {(['night', 'morning', 'day'] as const).map((nextPhase) => (
+                {(['night', 'morning', 'day', 'discussion'] as const).map((nextPhase) => (
                     <button
                         key={nextPhase}
                         type="button"
@@ -79,15 +93,37 @@ export default function HostScreenPreview() {
                 <button type="button" className="btn-secondary" onClick={toggleMorningReveal}>
                     {morning.deadIds.length === 0 ? 'Preview a death' : 'Preview everyone survived'}
                 </button>
+                <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setShowDayResult((prev) => !prev)}
+                >
+                    {showDayResult ? 'Preview Day voting' : 'Preview Day result'}
+                </button>
             </div>
 
             {phase.phase === 'night' ? (
                 <NightScreen phase={phase} clockOffsetMs={0} />
             ) : phase.phase === 'morning' ? (
                 <MorningScreen room={mockRoom} phase={phase} morning={morning} clockOffsetMs={0} />
+            ) : phase.phase === 'day' ? (
+                <DayScreen
+                    room={mockRoom}
+                    phase={phase}
+                    clockOffsetMs={0}
+                    dayProgress={SAMPLE_DAY_PROGRESS}
+                    dayResult={showDayResult ? SAMPLE_DAY_RESULT : null}
+                />
             ) : (
-                <DayScreen room={mockRoom} phase={phase} clockOffsetMs={0} />
+                <DiscussionScreen
+                    room={mockRoom}
+                    phase={phase}
+                    clockOffsetMs={0}
+                    dayResult={SAMPLE_DAY_RESULT}
+                />
             )}
         </div>
     );
 }
+
+export default HostScreenPreview;

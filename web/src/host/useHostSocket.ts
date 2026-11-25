@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import type {
+  DayProgress,
+  DayResult,
   GameOver,
   MorningReveal,
   PhaseStart,
@@ -23,6 +25,8 @@ export interface HostGame {
   // Server time minus local time, so countdowns follow the server clock.
   clockOffsetMs: number;
   morning: MorningReveal | null;
+  dayProgress: DayProgress | null;
+  dayResult: DayResult | null;
   vote: VoteReveal | null;
   // True for a few seconds after vote:reveal.
   showingVote: boolean;
@@ -42,6 +46,8 @@ export function useHostSocket(getToken: () => Promise<string>): HostGame {
   const [phase, setPhase] = useState<PhaseStart | null>(null);
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
   const [morning, setMorning] = useState<MorningReveal | null>(null);
+  const [dayProgress, setDayProgress] = useState<DayProgress | null>(null);
+  const [dayResult, setDayResult] = useState<DayResult | null>(null);
   const [vote, setVote] = useState<VoteReveal | null>(null);
   const [showingVote, setShowingVote] = useState(false);
   const [gameOver, setGameOver] = useState<GameOver | null>(null);
@@ -69,11 +75,19 @@ export function useHostSocket(getToken: () => Promise<string>): HostGame {
     socket.on('disconnect', () => setConnected(false));
     socket.on('connect_error', (err) => setError({ code: 'internal', message: `Can't reach the game server: ${err.message}` }));
     socket.on('room:state', (state: RoomState) => setRoom(state));
-    socket.on('phase:start', (next: PhaseStart) => {
-      setClockOffsetMs(next.serverNow - Date.now());
+    socket.on("phase:start", (next: PhaseStart) => {
       setPhase(next);
+      setClockOffsetMs(next.serverNow - Date.now());
+      if (next.phase === "day") {
+        setDayProgress(null);
+        setDayResult(null);
+      } else if (next.phase === "night") {
+        setDayResult(null);
+      }
     });
-    socket.on('morning:reveal', (reveal: MorningReveal) => setMorning(reveal));
+    socket.on("morning:reveal", (reveal: MorningReveal) => setMorning(reveal));
+    socket.on("day:progress", (progress: DayProgress) => setDayProgress(progress));
+    socket.on("day:result", (result: DayResult) => setDayResult(result));
     socket.on('vote:reveal', (reveal: VoteReveal) => {
       setVote(reveal);
       setShowingVote(true);
@@ -96,6 +110,8 @@ export function useHostSocket(getToken: () => Promise<string>): HostGame {
     phase,
     clockOffsetMs,
     morning,
+    dayProgress,
+    dayResult,
     vote,
     showingVote,
     gameOver,
