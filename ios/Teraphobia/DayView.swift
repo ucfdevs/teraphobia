@@ -2,24 +2,21 @@ import SwiftUI
 
 // The village's Day vote (#102): every living player, the Monster included, votes for one action
 // the whole village takes. A vote can change until Day ends. The Monster also sees a rotating flavor
-// message and its power button until it's used.
+// message; its power is in the role card (#113), which only its owner opens.
 // Every card looks and sounds the same for every role, so a glance at the Monster's phone gives nothing away.
 struct DayView: View {
     let you: YouRole
     let seats: [PublicSeat]
     let round: Int
     let deadline: Date
-    let powerUsed: Bool
     // This phone's vote today, or nil before it votes.
     let ballot: DaySubmit?
     let options: BallotOptions
     let progress: DayProgress?
     let cast: (DaySubmit) -> Void
-    let usePower: (PowerUse) -> Void
 
     // Candle tapped but nobody picked to protect yet. A Candle vote isn't sent until it has a target.
     @State private var choosingCandle = false
-    @State private var choosingPowerTarget = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -38,18 +35,8 @@ struct DayView: View {
         return ballot == nil ? "The village does whatever gets the most votes." : "Locked in. You can change your vote until Day ends."
     }
 
-    // Vampire and Witch powers are used during Day. The Werewolf's is at Night.
-    private var showPower: Bool {
-        isMonster && you.monsterType != .werewolf && !powerUsed
-    }
-
-    // Choosing a power target is a Monster-only moment, so only then does the screen take the Monster look.
-    private var look: ScreenLook {
-        showPower && choosingPowerTarget ? ScreenLook(you: you, moment: .usingPower) : .neutral
-    }
-
     var body: some View {
-        PhaseLayout(title: "Day \(round)", deadline: deadline, you: you, heading: "Daylight, for now", look: look) {
+        PhaseLayout(title: "Day \(round)", deadline: deadline, you: you, heading: "Daylight, for now") {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeading("Vote for one")
                 // Not in a GlassGroup: inside one, the selected card's orange border blends into the glass and disappears.
@@ -87,30 +74,8 @@ struct DayView: View {
                     }
                 }
             }
-
-            if showPower {
-                if choosingPowerTarget {
-                    VStack(alignment: .leading, spacing: 12) {
-                        PlayerPicker(header: powerTitle, seats: seats, you: you, picked: [], onPick: { seatID in
-                            usePower(PowerUse(targetID: seatID))
-                            choosingPowerTarget = false
-                        })
-                        Button("Not now") { choosingPowerTarget = false }
-                            .buttonStyle(.quiet)
-                    }
-                    .transition(.opacity)
-                } else {
-                    Button(powerTitle) { choosingPowerTarget = true }
-                        .buttonStyle(.quiet)
-                }
-            }
         }
         .animation(reduceMotion ? nil : .spring(duration: 0.35), value: picked)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: choosingPowerTarget)
-    }
-
-    private var powerTitle: String {
-        you.monsterType == .vampire ? "Block a player's action" : "Plant a fake clue"
     }
 
     private func actionCard(_ value: DayAction, _ title: String, detail: String, icon: String) -> some View {
@@ -249,10 +214,10 @@ struct ResultView: View {
 #Preview {
     NavigationStack {
         DayView(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: .vampire, role: .monster, seatID: "seat0"),
-                seats: PublicSeat.previews, round: 2, deadline: .now.addingTimeInterval(30), powerUsed: false,
+                seats: PublicSeat.previews, round: 2, deadline: .now.addingTimeInterval(30),
                 ballot: DaySubmit(action: .commune, targetID: nil),
                 options: BallotOptions(options: DayOptions(commune: true, round: 2, search: false), round: 2),
                 progress: DayProgress(round: 2, voted: 3, voters: 5),
-                cast: { _ in }, usePower: { _ in })
+                cast: { _ in })
     }
 }

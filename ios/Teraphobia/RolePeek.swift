@@ -1,35 +1,94 @@
 import SwiftUI
 
-// The role stays hidden until the player presses and holds, so nobody nearby can read it. Holding flips
-// the card over to its face; letting go flips it back. The back looks the same for everyone, and only
-// the Monster's face gets the Monster look. With Reduce Motion the two sides crossfade instead.
+// The role stays hidden until the player holds the card for half a second, so nobody nearby can read it.
+// The card flips to its face and stays open after letting go, so the Monster can tap its power (#113).
+// A tap closes it, and it closes by itself after 8 seconds. The gesture and the back are the same on
+// every phone, and only the Monster's face gets the Monster look. With Reduce Motion the sides crossfade.
 struct RolePeek: View {
     let you: YouRole
     @State private var peeking = false
+    @Environment(\.rolePower) private var power
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     private let minHeight: CGFloat = 76
+    // The power row is the same height whether it holds a button or a note, so an open card is the same size on every phone.
+    private let powerRowHeight: CGFloat = 56
 
     var body: some View {
+        VStack(spacing: 8) {
+            card
+            if peeking {
+                powerRow
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        // Closes by itself so it isn't left open on the table. VoiceOver users close it themselves,
+        // since swiping to the power button can take longer than 8 seconds.
+        .task(id: peeking) {
+            guard peeking, !voiceOver else { return }
+            try? await Task.sleep(for: .seconds(8))
+            if !Task.isCancelled { setPeeking(false) }
+        }
+    }
+
+    private var card: some View {
         ZStack {
             side(visible: !peeking, angle: peeking ? 180 : 0) { back }
             side(visible: peeking, angle: peeking ? 0 : -180) { face }
         }
         .frame(maxWidth: .infinity)
-        // Both sides take the taller one's height, so a peek never moves what's below and large text still fits.
+        // Both sides take the taller one's height, so a flip never moves what's below and large text still fits.
         .fixedSize(horizontal: false, vertical: true)
         .contentShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
-        .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
-            withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.2)) {
-                peeking = pressing
-            }
-        }, perform: {})
+        // The hold wins, so letting go after it doesn't count as the tap that closes the card.
+        .gesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in setPeeking(true) }
+                .exclusively(before: TapGesture().onEnded { if peeking { setPeeking(false) } })
+        )
         .sensoryFeedback(.impact(weight: .light), trigger: peeking) { _, isPeeking in isPeeking }
         .accessibilityElement()
         .accessibilityLabel(peeking ? roleText : "Your role, hidden")
         .accessibilityHint("Double tap to show or hide your role")
         .accessibilityAddTraits(.isButton)
-        .accessibilityAction { peeking.toggle() }
+        .accessibilityAction { setPeeking(!peeking) }
+    }
+
+    private func setPeeking(_ value: Bool) {
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.2)) {
+            peeking = value
+        }
+    }
+
+    // The Vampire's or Witch's power button during Day, or a line about the power (or its absence).
+    @ViewBuilder
+    private var powerRow: some View {
+        switch power.slot(for: you) {
+        case .button(let title):
+            // Navy like a Villager's note, not candle orange, so an open card doesn't stand out across the table.
+            Button(title, action: power.use)
+                .buttonStyle(.quiet)
+                .frame(minHeight: powerRowHeight)
+        case .note(let text):
+            HStack(spacing: 12) {
+                Image(systemName: "info.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.moon)
+                    .frame(width: 32)
+                    .accessibilityHidden(true)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: powerRowHeight)
+            .surface(.card)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     @ViewBuilder
@@ -156,6 +215,7 @@ private struct FlipSide: ViewModifier, Animatable {
     VStack(spacing: 16) {
         RolePeek(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: nil, role: .villager, seatID: "seat0"))
         RolePeek(you: YouRole(costume: Costume(hat: .topHat, item: .lantern, mask: .dominoMask), monsterType: .witch, role: .monster, seatID: "seat0"))
+            .environment(\.rolePower, RolePower(isDay: true))
     }
     .padding(Theme.gutter)
     .frame(maxHeight: .infinity)

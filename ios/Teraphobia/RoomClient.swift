@@ -36,7 +36,10 @@ final class RoomClient {
     // This phone's own ballot and the round it was cast in. The server keeps the last one sent.
     var ballot: DaySubmit?
     var ballotRound: Int?
+    // The Monster's power, as the server last said (you:power after each Day, or the rejoin).
     var powerUsed = false
+    // The Day round the Vampire's or Witch's power was sent in. The server holds it until Day ends.
+    var powerSentRound: Int?
     var nightVictims = 0
     var gameError: String?
 
@@ -102,6 +105,7 @@ final class RoomClient {
         ballot = nil
         ballotRound = nil
         powerUsed = false
+        powerSentRound = nil
         nightVictims = 0
         gameError = nil
         reconnecting = false
@@ -122,6 +126,14 @@ final class RoomClient {
         ballot = submit
         ballotRound = phase?.round
         emit("day:submit", submit)
+    }
+
+    // The Vampire's or Witch's power. It's only marked used when the server's you:power says so.
+    func usePower() {
+        // Already sent today: the server holds it, and a second one would only be refused.
+        guard let round = phase?.round, powerSentRound != round else { return }
+        powerSentRound = round
+        emit("power:use", PowerUse(targetID: nil))
     }
 
     // Skip is "targetId": null, but VoteSubmit(targetID: nil) encodes as {}, which the server refuses. So this payload is built by hand.
@@ -214,6 +226,12 @@ final class RoomClient {
         socket.on("day:result") { [weak self] data, _ in
             self?.dayResult = Self.decode(DayResult.self, data)
         }
+        // After every Day. A Witch whose fake met a Candle day keeps her power, so this can say false.
+        socket.on("you:power") { [weak self] data, _ in
+            guard let self, let power = Self.decode(YouPower.self, data) else { return }
+            powerUsed = power.powerUsed
+            powerSentRound = nil
+        }
         socket.on(clientEvent: .reconnect) { [weak self] _, _ in
             self?.reconnecting = true
         }
@@ -251,6 +269,9 @@ final class RoomClient {
                 gameError = serverError?.message
                 // A refused Day ballot didn't replace the one before it, so the screen goes back to that one.
                 if serverError?.event == "day:submit" { ballot = ballotBeforeCast }
+                // A refused power was never held, so the button comes back. Except "power used": then the server
+                // already holds one (or it's spent), and you:power will say which when Day ends.
+                if serverError?.event == "power:use", serverError?.code != .powerUsed { powerSentRound = nil }
                 return
             }
             // Name problems go under the name field; anything else under the Join button.

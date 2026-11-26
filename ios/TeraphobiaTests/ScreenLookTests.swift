@@ -17,13 +17,12 @@ struct ScreenLookTests {
         #expect(ScreenLook(you: you(.monster, .witch), moment: moment) == .neutral)
     }
 
-    @Test(arguments: [ScreenMoment.choosingVictim, .usingPower, .roleCardFace, .dayActions])
+    @Test(arguments: [ScreenMoment.choosingVictim, .roleCardFace, .dayActions])
     func villagerIsAlwaysNeutral(moment: ScreenMoment) {
         #expect(ScreenLook(you: you(.villager), moment: moment) == .neutral)
     }
 
-    @Test(arguments: [ScreenMoment.usingPower, .roleCardFace])
-    func otherMonsterOnlyMomentsGetTheLook(moment: ScreenMoment) {
-        #expect(ScreenLook(you: you(.monster, .werewolf), moment: moment) == .monster(.werewolf))
+    @Test func roleCardFaceGetsTheLook() {
+        #expect(ScreenLook(you: you(.monster, .werewolf), moment: .roleCardFace) == .monster(.werewolf))
     }
 }

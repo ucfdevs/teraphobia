@@ -1,13 +1,13 @@
 // Where a game screen is, for deciding its look.
 enum ScreenMoment {
     // Monster-only moments: only the Monster's phone is ever in these.
-    case choosingVictim, usingPower, roleCardFace
+    case choosingVictim, roleCardFace
     // Everyone's phone is in these, and phones get seen.
     case dayActions, discussion, vote, watchingSharedScreen
 
     var isMonsterOnly: Bool {
         switch self {
-        case .choosingVictim, .usingPower, .roleCardFace: true
+        case .choosingVictim, .roleCardFace: true
         case .dayActions, .discussion, .vote, .watchingSharedScreen: false
         }
     }
