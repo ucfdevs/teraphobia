@@ -111,6 +111,52 @@ final class TeraphobiaUITests: XCTestCase {
         try audit(app)
     }
 
+    // Holding the role card opens it and it stays open, with the power button on the first screen (#113).
+    func testMonsterPowerIsInTheRoleCard() throws {
+        for (type, power) in [("vampire", "Block today's action"), ("witch", "Plant a fake clue today")] {
+            let app = launch("day", ["-monster", type])
+            XCTAssertTrue(app.navigationBars["Day 1"].waitForExistence(timeout: 5))
+            // The Day screen has no power control outside the card.
+            XCTAssertFalse(button(power, in: app).exists)
+
+            button("Your role", in: app).press(forDuration: 0.7)
+            let use = button(power, in: app)
+            XCTAssertTrue(use.waitForExistence(timeout: 2))
+            XCTAssertTrue(use.isHittable)
+            try audit(app)
+
+            // A tap closes it.
+            button("You are the", in: app).tap()
+            XCTAssertTrue(button("Your role, hidden", in: app).waitForExistence(timeout: 2))
+            XCTAssertFalse(use.exists)
+            app.terminate()
+        }
+    }
+
+    // The card's hold gesture must not stop the page from scrolling when a swipe starts on it.
+    func testSwipeOnRoleCardScrollsThePage() throws {
+        let app = launch("day")
+        XCTAssertTrue(app.navigationBars["Day 1"].waitForExistence(timeout: 5))
+        let card = button("Your role", in: app)
+        let top = card.frame.minY
+        card.swipeUp()
+        XCTAssertLessThan(card.frame.minY, top)
+        XCTAssertTrue(button("Your role, hidden", in: app).exists)
+    }
+
+    func testVillagerRoleCardHasNoPower() throws {
+        let app = launch("day")
+        XCTAssertTrue(app.navigationBars["Day 1"].waitForExistence(timeout: 5))
+        button("Your role", in: app).press(forDuration: 0.7)
+        XCTAssertTrue(button("You are a Villager", in: app).waitForExistence(timeout: 2))
+        XCTAssertTrue(text("Villagers have no power", in: app).exists)
+        XCTAssertFalse(button("Block today's action", in: app).exists)
+        XCTAssertFalse(button("Plant a fake clue", in: app).exists)
+
+        // An open card closes by itself after 8 seconds.
+        XCTAssertTrue(button("Your role, hidden", in: app).waitForExistence(timeout: 10))
+    }
+
     func testDiscussionShowsClue() throws {
         let app = launch("discussion")
         XCTAssertTrue(text("The Monster wears the crown", in: app).waitForExistence(timeout: 5))

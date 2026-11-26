@@ -10,6 +10,12 @@ struct GameView: View {
         client.room?.seats.first { $0.seatID == client.seatID }?.lifeStatus ?? .alive
     }
 
+    // The Monster's power, for the role card on every game screen.
+    private var rolePower: RolePower {
+        RolePower(isDay: client.phase?.phase == .day, round: client.phase?.round ?? 0, used: client.powerUsed,
+                  sentRound: client.powerSentRound, use: client.usePower)
+    }
+
     // The death sting waiting to play, so it can be called off when this screen goes away.
     @State private var deathSting: Task<Void, Never>?
     @Environment(\.scenePhase) private var scenePhase
@@ -34,15 +40,10 @@ struct GameView: View {
                     }
                 case .day:
                     DayView(you: you, seats: seats, round: phase.round, deadline: client.phaseDeadline,
-                            powerUsed: client.powerUsed,
                             ballot: client.ballotRound == phase.round ? client.ballot : nil,
                             options: BallotOptions(options: client.dayOptions, round: phase.round),
                             progress: client.dayProgress,
-                            cast: client.cast,
-                            usePower: { power in
-                                client.emit("power:use", power)
-                                client.powerUsed = true
-                            })
+                            cast: client.cast)
                 case .discussion:
                     ResultView(you: you, deadline: client.phaseDeadline,
                                outcome: DayOutcome(result: client.dayResult, search: client.result, round: phase.round,
@@ -61,6 +62,7 @@ struct GameView: View {
         }
         .environment(\.gameBackdrop, client.phase.map { Backdrop(phase: $0.phase) } ?? .plain)
         .environment(\.phaseStartedAt, client.phaseStartedAt)
+        .environment(\.rolePower, rolePower)
         .alert("Not allowed", isPresented: Binding(get: { client.gameError != nil }, set: { _ in client.gameError = nil })) {
             Button("OK") {}
         } message: {

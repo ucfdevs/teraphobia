@@ -98,6 +98,18 @@ struct SocketEventsTests {
         #expect(json?["targetId"] as? String == "s2")
     }
 
+    // A Witch whose fake met a Candle day keeps her power, so the server says so after every Day.
+    @Test func youPowerCarriesTheRealPowerState() throws {
+        #expect(try decode(YouPower.self, #"{"powerUsed":false}"#).powerUsed == false)
+        #expect(try decode(YouPower.self, #"{"powerUsed":true}"#).powerUsed == true)
+    }
+
+    // power:use takes no target, so the phone sends an empty object.
+    @Test func powerUseSendsNoTarget() throws {
+        let data = try JSONEncoder().encode(PowerUse(targetID: nil))
+        #expect(String(decoding: data, as: UTF8.self) == "{}")
+    }
+
     @Test func nightPickUsesServerKeys() throws {
         let data = try JSONEncoder().encode(NightSubmit(victimIDS: ["s2"], suspectID: nil))
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
