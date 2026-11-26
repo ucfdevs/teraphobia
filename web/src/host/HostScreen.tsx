@@ -35,37 +35,51 @@ interface Props {
 
 export default function HostScreen({ session, onSessionChange, onExit }: Props) {
   const sessionRef = useRef(session);
+  const refreshing = useRef<Promise<string> | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
-  // A fresh access token, refreshing first if this one is about to expire. Refresh tokens rotate, so the new
-  // pair goes back to App for the next time.
-  const getToken = useCallback(async () => {
-    const current = sessionRef.current;
-    if (Date.now() - current.issuedAt < ACCESS_TOKEN_MAX_AGE_MS) return current.accessToken;
-    const res = await fetch('/api/auth/refresh', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: current.refreshToken }),
-    });
-    if (!res.ok) throw new Error('Your session expired. Sign in again.');
-    const data = await res.json();
-    const next = { accessToken: data.accessToken, refreshToken: data.refreshToken, issuedAt: Date.now() };
-    sessionRef.current = next;
-    onSessionChange(next);
-    return next.accessToken;
-  }, [onSessionChange]);
+  // A fresh access token, refreshing first if this one is about to expire (or if `force`, after the server
+  // refused it). Refresh tokens rotate, so callers share one refresh in flight, and the new pair goes back to
+  // App for the next time.
+  const getToken = useCallback(
+    async (force = false) => {
+      const current = sessionRef.current;
+      if (!force && Date.now() - current.issuedAt < ACCESS_TOKEN_MAX_AGE_MS) return current.accessToken;
+      refreshing.current ??= (async () => {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: current.refreshToken }),
+        });
+        if (!res.ok) throw new Error('Your session expired. Sign in again.');
+        const data = await res.json();
+        const next = { accessToken: data.accessToken, refreshToken: data.refreshToken, issuedAt: Date.now() };
+        sessionRef.current = next;
+        onSessionChange(next);
+        return next.accessToken;
+      })().finally(() => {
+        refreshing.current = null;
+      });
+      return refreshing.current;
+    },
+    [onSessionChange],
+  );
 
   const createRoom = async (preset: Preset) => {
     setCreating(true);
     setCreateError('');
     try {
-      const res = await fetch('/api/rooms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await getToken()}` },
-        body: JSON.stringify({ preset }),
-      });
+      const post = async (token: string) =>
+        fetch('/api/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ preset }),
+        });
+      let res = await post(await getToken());
+      // The token can still be refused (clock skew, revoked): refresh once and try again.
+      if (res.status === 401) res = await post(await getToken(true));
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not create a room');
       setCode(data.code);
